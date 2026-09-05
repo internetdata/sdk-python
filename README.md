@@ -1,4 +1,4 @@
-# [<img src="https://docs.internetdata.io/logo.svg" alt="InternetData" width="24"/>](https://internetdata.io/) InternetData Python Client Library
+# [<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" width="24"/>](https://internetdata.io/) InternetData Python Client Library
 
 [![PyPI](https://img.shields.io/pypi/v/internetdata.svg)](https://pypi.org/project/internetdata/)
 [![license](https://img.shields.io/pypi/l/internetdata.svg)](LICENSE)
@@ -143,7 +143,7 @@ There are official InternetData client libraries available for many languages in
 
 InternetData: IP and network intelligence databases, published as CSV and MMDB, licensed by contract and downloadable on demand.
 
-[<img src="https://docs.internetdata.io/logo.svg" alt="InternetData" width="96"/>](https://internetdata.io/)
+[<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" width="96"/>](https://internetdata.io/)
 
 ## License
 
