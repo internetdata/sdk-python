@@ -80,7 +80,7 @@ line-length = 100
 [tool.ruff.lint.per-file-ignores]
 # The generated tree is replaced wholesale by scripts/generate.sh, so a lint fix here
 # would be undone by the next spec refresh. This one fires because the spec spells
-# `redistribution` as a nullable enum and the generator renders that as three separate
+# `license_type` as a nullable enum and the generator renders that as three separate
 # single-member classes, hence three `isinstance` arms it will not merge.
 "src/internetdata/_generated/**/*.py" = ["SIM101"]
 

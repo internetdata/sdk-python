@@ -54,14 +54,11 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Error | ListDatabasesResponse200]:
-    """Every database your organization may see, and where each one stands
+    """List
 
      The whole published catalog, with your organization's licence beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-
-    Databases commissioned for a single customer are not listed to anyone
-    else.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -84,14 +81,11 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> Error | ListDatabasesResponse200 | None:
-    """Every database your organization may see, and where each one stands
+    """List
 
      The whole published catalog, with your organization's licence beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-
-    Databases commissioned for a single customer are not listed to anyone
-    else.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -110,14 +104,11 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[Error | ListDatabasesResponse200]:
-    """Every database your organization may see, and where each one stands
+    """List
 
      The whole published catalog, with your organization's licence beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-
-    Databases commissioned for a single customer are not listed to anyone
-    else.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,14 +129,11 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> Error | ListDatabasesResponse200 | None:
-    """Every database your organization may see, and where each one stands
+    """List
 
      The whole published catalog, with your organization's licence beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-
-    Databases commissioned for a single customer are not listed to anyone
-    else.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

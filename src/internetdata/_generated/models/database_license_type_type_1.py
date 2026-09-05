@@ -1,10 +1,10 @@
 from enum import StrEnum
 
 
-class DatabaseRedistributionType3Type1(StrEnum):
+class DatabaseLicenseTypeType1(StrEnum):
     EVALUATION = "evaluation"
-    INTERNAL = "internal"
     REDISTRIBUTE = "redistribute"
+    STANDARD = "standard"
 
     def __str__(self) -> str:
         return str(self.value)

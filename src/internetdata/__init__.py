@@ -22,7 +22,7 @@ from .models import (
     Format,
     MetadataColumn,
     Outcome,
-    Redistribution,
+    LicenseType,
     Standing,
 )
 
@@ -43,7 +43,7 @@ __all__ = [
     "InternetDataError",
     "MetadataColumn",
     "Outcome",
-    "Redistribution",
+    "LicenseType",
     "Standing",
     "__version__",
 ]

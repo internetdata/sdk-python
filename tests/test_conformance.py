@@ -22,16 +22,16 @@ from helpers import (
 from internetdata import InternetDataError
 
 # One live grant, one that has run out, and one never bought. Between them these cover
-# every value the corpus pins for `standing` and `redistribution`.
+# every value the corpus pins for `standing` and `license_type`.
 CATALOG = [
-    database("bogon_ip", standing="licensed", redistribution="redistribute"),
+    database("bogon_ip", standing="licensed", license_type="redistribute"),
     database(
         "bogon_asn",
         standing="expired",
-        redistribution="evaluation",
+        license_type="evaluation",
         expires="2026-01-01T00:00:00.000Z",
     ),
-    database("vpn_ip", standing="unlicensed", redistribution=None, starts=None),
+    database("vpn_ip", standing="unlicensed", license_type=None, starts=None),
 ]
 
 
@@ -102,7 +102,7 @@ def test_the_two_429s_differ_only_by_retry_after(make_client: ClientFactory) -> 
         )
 
 
-def test_the_catalog_carries_every_standing_and_redistribution_the_corpus_pins(
+def test_the_catalog_carries_every_standing_and_license_type_the_corpus_pins(
     make_client: ClientFactory,
 ) -> None:
     stub = Stub({LIST_PATH: {"body": {"databases": CATALOG}}})
@@ -114,12 +114,12 @@ def test_the_catalog_carries_every_standing_and_redistribution_the_corpus_pins(
         "the served order is the answer's order"
     )
     assert {f.standing for f in families} == set(TESTDATA["standings"])
-    served_rights = {f.redistribution for f in families if f.redistribution is not None}
-    assert served_rights <= set(TESTDATA["redistribution"]), (
-        f"undocumented redistribution right in {served_rights}"
+    served_rights = {f.license_type for f in families if f.license_type is not None}
+    assert served_rights <= set(TESTDATA["license_type"]), (
+        f"undocumented license_type right in {served_rights}"
     )
     # Null when there is no licence, which is a different answer from any of the three.
-    assert [f.redistribution for f in families][-1] is None
+    assert [f.license_type for f in families][-1] is None
     for family in families:
         assert family.versions, f"{family.base} carries no versions"
         for version in family.versions:

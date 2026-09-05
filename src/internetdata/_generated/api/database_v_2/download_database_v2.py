@@ -89,7 +89,7 @@ def sync_detailed(
     id: str,
     format_: DownloadDatabaseV2Format,
 ) -> Response[Any | Error]:
-    """Redirect to a time-limited download URL for one database
+    """Download
 
      Answers `302`; the bytes come straight from object storage rather than
     through this API. Follow the redirect.
@@ -124,7 +124,7 @@ def sync(
     id: str,
     format_: DownloadDatabaseV2Format,
 ) -> Any | Error | None:
-    """Redirect to a time-limited download URL for one database
+    """Download
 
      Answers `302`; the bytes come straight from object storage rather than
     through this API. Follow the redirect.
@@ -154,7 +154,7 @@ async def asyncio_detailed(
     id: str,
     format_: DownloadDatabaseV2Format,
 ) -> Response[Any | Error]:
-    """Redirect to a time-limited download URL for one database
+    """Download
 
      Answers `302`; the bytes come straight from object storage rather than
     through this API. Follow the redirect.
@@ -187,7 +187,7 @@ async def asyncio(
     id: str,
     format_: DownloadDatabaseV2Format,
 ) -> Any | Error | None:
-    """Redirect to a time-limited download URL for one database
+    """Download
 
      Answers `302`; the bytes come straight from object storage rather than
     through this API. Follow the redirect.

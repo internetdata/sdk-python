@@ -1,7 +1,7 @@
 """What the API answers, and the one place the wire shape becomes an idiomatic one.
 
 The generated models are a wire contract rather than an API: the spec spells
-`redistribution` as a nullable enum, which the generator renders as a union of three
+`license_type` as a nullable enum, which the generator renders as a union of three
 single-member enum classes, and nobody should have to read that. These are frozen
 dataclasses of plain values, built straight from the served JSON, with `raw` kept beside
 them so a field this pinned spec predates is still reachable.
@@ -21,7 +21,7 @@ __all__ = [
     "Format",
     "MetadataColumn",
     "Outcome",
-    "Redistribution",
+    "LicenseType",
     "Standing",
 ]
 
@@ -36,7 +36,7 @@ id and no MMDB exists for them.
 Standing = Literal["licensed", "expired", "unlicensed"]
 """Where your organization stands with one database family."""
 
-Redistribution = Literal["evaluation", "internal", "redistribute"]
+LicenseType = Literal["evaluation", "standard", "redistribute"]
 """What a licence permits you to do with the data. `None` when there is no licence."""
 
 Outcome = Literal["ok", "unauthorized", "denied", "expired", "unknown", "unavailable"]
@@ -73,7 +73,7 @@ class Database:
     name: str
     summary: str
     standing: Standing
-    redistribution: Redistribution | None
+    license_type: LicenseType | None
     starts: datetime.datetime | None
     expires: datetime.datetime | None
     versions: tuple[DatabaseVersion, ...]
@@ -134,7 +134,7 @@ def to_database(body: dict[str, Any]) -> Database:
         name=body["name"],
         summary=body["summary"],
         standing=body["standing"],
-        redistribution=body["redistribution"],
+        license_type=body["license_type"],
         starts=_datetime(body["starts"]),
         expires=_datetime(body["expires"]),
         versions=tuple(to_version(v) for v in body["versions"]),

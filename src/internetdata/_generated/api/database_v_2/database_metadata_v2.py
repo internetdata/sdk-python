@@ -80,7 +80,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     id: str,
 ) -> Response[DatabaseMetadata | Error]:
-    """What is inside one database - schema, sample rows, row count, sizes
+    """Metadata
 
      Poll this to decide whether today's build is worth fetching: it carries
     `updated` and `entries` without downloading anything.
@@ -115,7 +115,7 @@ def sync(
     client: AuthenticatedClient,
     id: str,
 ) -> DatabaseMetadata | Error | None:
-    """What is inside one database - schema, sample rows, row count, sizes
+    """Metadata
 
      Poll this to decide whether today's build is worth fetching: it carries
     `updated` and `entries` without downloading anything.
@@ -145,7 +145,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     id: str,
 ) -> Response[DatabaseMetadata | Error]:
-    """What is inside one database - schema, sample rows, row count, sizes
+    """Metadata
 
      Poll this to decide whether today's build is worth fetching: it carries
     `updated` and `entries` without downloading anything.
@@ -178,7 +178,7 @@ async def asyncio(
     client: AuthenticatedClient,
     id: str,
 ) -> DatabaseMetadata | Error | None:
-    """What is inside one database - schema, sample rows, row count, sizes
+    """Metadata
 
      Poll this to decide whether today's build is worth fetching: it carries
     `updated` and `entries` without downloading anything.

@@ -36,7 +36,7 @@ CEILING = 8 << 20
 HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 STANDINGS = ("licensed", "expired", "unlicensed")
-RIGHTS = ("evaluation", "internal", "redistribute")
+RIGHTS = ("evaluation", "standard", "redistribute")
 FORMATS = ("csvgz", "mmdb")
 
 
@@ -61,8 +61,8 @@ def test_the_catalog_answers_the_schema_the_client_was_generated_from() -> None:
         assert family.standing in STANDINGS, (
             f"{family.base} carries an undocumented standing {family.standing!r}"
         )
-        assert family.redistribution is None or family.redistribution in RIGHTS, (
-            f"{family.base} carries an undocumented right {family.redistribution!r}"
+        assert family.license_type is None or family.license_type in RIGHTS, (
+            f"{family.base} carries an undocumented right {family.license_type!r}"
         )
         # A licence covers the family, and these are the ids the other calls take.
         assert family.versions, f"{family.base} carries no versions"
@@ -83,7 +83,7 @@ def test_an_unlicensed_family_is_absent_or_marked_never_half_licensed() -> None:
     EXCEPT for the families built for a single customer, which are absent entirely. So the
     only thing a client can check without knowing what it is not allowed to see is that
     every entry it did get is internally consistent: a live grant carries a
-    redistribution right, and one it never bought does not.
+    license_type right, and one it never bought does not.
     """
     client, _ = api()
     try:
@@ -93,12 +93,12 @@ def test_an_unlicensed_family_is_absent_or_marked_never_half_licensed() -> None:
 
     for family in families:
         if family.standing == "licensed":
-            assert family.redistribution is not None, (
-                f"{family.base} is licensed but says nothing about redistribution"
+            assert family.license_type is not None, (
+                f"{family.base} is licensed but says nothing about license_type"
             )
         if family.standing == "unlicensed":
-            assert family.redistribution is None, (
-                f"{family.base} was never bought but carries a redistribution right"
+            assert family.license_type is None, (
+                f"{family.base} was never bought but carries a license_type right"
             )
             assert family.starts is None, f"{family.base} was never bought but has a start date"
 

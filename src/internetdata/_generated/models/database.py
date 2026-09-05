@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.database_redistribution_type_1 import DatabaseRedistributionType1
-from ..models.database_redistribution_type_2_type_1 import DatabaseRedistributionType2Type1
-from ..models.database_redistribution_type_3_type_1 import DatabaseRedistributionType3Type1
+from ..models.database_license_type_type_1 import DatabaseLicenseTypeType1
+from ..models.database_license_type_type_2_type_1 import DatabaseLicenseTypeType2Type1
+from ..models.database_license_type_type_3_type_1 import DatabaseLicenseTypeType3Type1
 from ..models.database_standing import DatabaseStanding
 
 if TYPE_CHECKING:
@@ -31,8 +31,8 @@ class Database:
             summary (str): One line on what the newest version contains.
             standing (DatabaseStanding): `licensed` is a live grant, `expired` one whose term has ended, and
                 `unlicensed` a database published but never bought.
-            redistribution (DatabaseRedistributionType1 | DatabaseRedistributionType2Type1 |
-                DatabaseRedistributionType3Type1 | None): What your licence permits you to do with the data. Null when there
+            license_type (DatabaseLicenseTypeType1 | DatabaseLicenseTypeType2Type1 | DatabaseLicenseTypeType3Type1 | None):
+                What your licence permits you to do with the data. Null when there
                 is no licence.
             starts (datetime.datetime | None):
             expires (datetime.datetime | None): Null when the licence has no end date, or when there is none.
@@ -44,10 +44,10 @@ class Database:
     name: str
     summary: str
     standing: DatabaseStanding
-    redistribution: (
-        DatabaseRedistributionType1
-        | DatabaseRedistributionType2Type1
-        | DatabaseRedistributionType3Type1
+    license_type: (
+        DatabaseLicenseTypeType1
+        | DatabaseLicenseTypeType2Type1
+        | DatabaseLicenseTypeType3Type1
         | None
     )
     starts: datetime.datetime | None
@@ -64,15 +64,15 @@ class Database:
 
         standing = self.standing.value
 
-        redistribution: None | str
+        license_type: None | str
         if (
-            isinstance(self.redistribution, DatabaseRedistributionType1)
-            or isinstance(self.redistribution, DatabaseRedistributionType2Type1)
-            or isinstance(self.redistribution, DatabaseRedistributionType3Type1)
+            isinstance(self.license_type, DatabaseLicenseTypeType1)
+            or isinstance(self.license_type, DatabaseLicenseTypeType2Type1)
+            or isinstance(self.license_type, DatabaseLicenseTypeType3Type1)
         ):
-            redistribution = self.redistribution.value
+            license_type = self.license_type.value
         else:
-            redistribution = self.redistribution
+            license_type = self.license_type
 
         starts: None | str
         if isinstance(self.starts, datetime.datetime):
@@ -99,7 +99,7 @@ class Database:
                 "name": name,
                 "summary": summary,
                 "standing": standing,
-                "redistribution": redistribution,
+                "license_type": license_type,
                 "starts": starts,
                 "expires": expires,
                 "versions": versions,
@@ -121,12 +121,12 @@ class Database:
 
         standing = DatabaseStanding(d.pop("standing"))
 
-        def _parse_redistribution(
+        def _parse_license_type(
             data: object,
         ) -> (
-            DatabaseRedistributionType1
-            | DatabaseRedistributionType2Type1
-            | DatabaseRedistributionType3Type1
+            DatabaseLicenseTypeType1
+            | DatabaseLicenseTypeType2Type1
+            | DatabaseLicenseTypeType3Type1
             | None
         ):
             if data is None:
@@ -134,36 +134,36 @@ class Database:
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                redistribution_type_1 = DatabaseRedistributionType1(data)
+                license_type_type_1 = DatabaseLicenseTypeType1(data)
 
-                return redistribution_type_1
+                return license_type_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                redistribution_type_2_type_1 = DatabaseRedistributionType2Type1(data)
+                license_type_type_2_type_1 = DatabaseLicenseTypeType2Type1(data)
 
-                return redistribution_type_2_type_1
+                return license_type_type_2_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                redistribution_type_3_type_1 = DatabaseRedistributionType3Type1(data)
+                license_type_type_3_type_1 = DatabaseLicenseTypeType3Type1(data)
 
-                return redistribution_type_3_type_1
+                return license_type_type_3_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             return cast(
-                DatabaseRedistributionType1
-                | DatabaseRedistributionType2Type1
-                | DatabaseRedistributionType3Type1
+                DatabaseLicenseTypeType1
+                | DatabaseLicenseTypeType2Type1
+                | DatabaseLicenseTypeType3Type1
                 | None,
                 data,
             )
 
-        redistribution = _parse_redistribution(d.pop("redistribution"))
+        license_type = _parse_license_type(d.pop("license_type"))
 
         def _parse_starts(data: object) -> datetime.datetime | None:
             if data is None:
@@ -207,7 +207,7 @@ class Database:
             name=name,
             summary=summary,
             standing=standing,
-            redistribution=redistribution,
+            license_type=license_type,
             starts=starts,
             expires=expires,
             versions=versions,
