@@ -48,7 +48,7 @@ for family in client.database.list():
         print(version.id, version.formats)   # 'bogon_ip_v1' ('csvgz', 'mmdb')
 ```
 
-`standing` is `licensed`, `expired` or `unlicensed`, and `license_type` is what your licence lets you do with the data (`evaluation`, `internal`, `redistribute`, or `None` when there is no licence). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
+`standing` is `licensed`, `expired` or `unlicensed`, and `license_type` is what your licence lets you do with the data (`evaluation`, `standard`, `redistribute`, or `None` when there is no licence). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
 
 ### What is inside a build
 
