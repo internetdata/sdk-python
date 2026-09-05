@@ -1,4 +1,4 @@
-# [<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" width="24"/>](https://internetdata.io/) InternetData Python Client Library
+# [<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" height="28"/>](https://internetdata.io/) InternetData Python Client Library
 
 [![PyPI](https://img.shields.io/pypi/v/internetdata.svg)](https://pypi.org/project/internetdata/)
 [![license](https://img.shields.io/pypi/l/internetdata.svg)](LICENSE)
