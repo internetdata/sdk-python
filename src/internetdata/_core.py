@@ -8,11 +8,11 @@ import json
 import os
 from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
-from typing import IO, Any, TypeVar
+from typing import IO, Any, TypeVar, cast
 
 import httpx
 
-from ._generated.client import AuthenticatedClient
+from ._generated.client import AuthenticatedClient, Client
 from ._generated.types import Response
 from .errors import InternetDataError, error_from_response
 from .models import Database, Download, to_database, to_download
@@ -32,15 +32,19 @@ T = TypeVar("T")
 
 
 def build_client(
-    api_key: str,
+    api_key: str | None,
     base_url: str,
     timeout: float | None,
     transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None,
 ) -> AuthenticatedClient:
     """The generated client, wired for one of ours.
 
-    Every endpoint here needs a key, so there is no keyless flavor to fall back to: an
-    `Authorization: Bearer ` with nothing after it is a 401, not an anonymous request.
+    Every generated endpoint function types `client` as `AuthenticatedClient` because
+    every operation lists a security scheme, but a keyless caller must send NO
+    `Authorization` header rather than an empty one: `Bearer ` with nothing after it is
+    a 401 that reads as a wrong key. The two classes are interchangeable where the
+    endpoints use them, so the keyless one is built as `Client` and the cast lives here
+    instead of at every call site.
 
     The transport is injected through `httpx_args` rather than with
     `set_httpx_client()`, which silently bypasses auth: the generated client only adds
@@ -49,6 +53,11 @@ def build_client(
     httpx_args: dict[str, Any] = {}
     if transport is not None:
         httpx_args["transport"] = transport
+    if not api_key:
+        return cast(
+            AuthenticatedClient,
+            Client(base_url=base_url, timeout=httpx.Timeout(timeout), httpx_args=httpx_args),
+        )
     return AuthenticatedClient(
         base_url=base_url,
         token=api_key,

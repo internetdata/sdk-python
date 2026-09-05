@@ -19,8 +19,10 @@ def key() -> str:
 
     Actions interpolates a secret that does not exist to an EMPTY STRING rather than
     leaving the variable unset, so "set but empty" and "absent" are the same thing here,
-    and both mean the suite has nothing to authenticate with. A client built with an empty
-    key would send `Authorization: Bearer ` and collect 401s that look like a broken API.
+    and both mean the suite has nothing to authenticate with. This gate is the only thing
+    standing between that and a green run: the client accepts a keyless build and sends
+    no `Authorization` header, so an ungated suite would collect 401s that every
+    assertion downstream reads as an ordinary refusal.
     """
     return os.environ.get(SECRET, "").strip()
 

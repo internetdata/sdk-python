@@ -204,3 +204,20 @@ def test_the_api_key_reaches_the_wire_under_the_bearer_scheme(
     client.database.list()
 
     assert stub.requests[0].headers.get("authorization") == f"Bearer {API_KEY}"
+
+
+@pytest.mark.parametrize("api_key", [None, ""])
+def test_a_keyless_client_sends_no_authorization_header(
+    make_client: ClientFactory, api_key: str | None
+) -> None:
+    """The key is optional because what this API serves without a licence is a product
+    decision, and a client that could not be built without one would have to change
+    shape to follow it. What must never go out is `Bearer ` with nothing after it, which
+    reads as a wrong key rather than as none.
+    """
+    stub = Stub({LIST_PATH: {"body": {"databases": []}}})
+    client = make_client(transport=stub.transport, api_key=api_key)
+
+    client.database.list()
+
+    assert "authorization" not in stub.requests[0].headers

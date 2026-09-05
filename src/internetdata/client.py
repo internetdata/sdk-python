@@ -53,8 +53,11 @@ T = TypeVar("T")
 class InternetData:
     """A client for the InternetData API.
 
-    Every endpoint needs an API key carrying the `db.download` scope, so one is required
-    rather than optional. Create a key in the console and pass it in.
+    Every database published today is licensed, so create a key carrying the
+    `db.download` scope in the console and pass it in. The argument is optional
+    nonetheless, and an absent or empty one sends no `Authorization` header at all
+    rather than an empty one: what this API serves without a licence is a product
+    decision, not the client's to refuse.
 
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
@@ -65,7 +68,7 @@ class InternetData:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
         retries: int = DEFAULT_RETRIES,

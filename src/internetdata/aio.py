@@ -67,7 +67,7 @@ class AsyncInternetData:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
         retries: int = DEFAULT_RETRIES,

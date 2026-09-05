@@ -41,11 +41,19 @@ FORMATS = ("csvgz", "mmdb")
 
 
 def test_the_catalog_answers_the_schema_the_client_was_generated_from() -> None:
-    client, _ = api()
+    client, recorder = api()
     try:
         families = catalog(client)
     finally:
         client.close()
+
+    # Everything below is vacuous unless the key reached the wire. The client builds
+    # happily without one and then sends no `Authorization` header at all, which is
+    # exactly what an unset CI secret produces, so this is where it has to be caught.
+    to_api = [fact for fact in recorder.facts if fact.origin == credential.STAGING]
+    assert to_api, "no request reached the staging API"
+    for fact in to_api:
+        assert fact.carried_key, f"the request to {fact.path} carried no key"
 
     assert families, "the catalog came back empty, so this key sees nothing at all"
     for family in families:
