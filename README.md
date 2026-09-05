@@ -50,8 +50,6 @@ for family in client.database.list():
 
 `standing` is `licensed`, `expired` or `unlicensed`, and `redistribution` is what your licence lets you do with the data (`evaluation`, `internal`, `redistribute`, or `None` when there is no licence). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
 
-**The catalog is not the same document for every key.** Databases commissioned for a single customer are absent from the listing entirely for everyone else, rather than shown as `unlicensed`. The server decides that per key, so treat what you get back as the answer for the key you asked with: this library never caches a listing, never reuses one across clients, and has no built-in list of database ids to fall back on.
-
 ### What is inside a build
 
 `metadata` is cheap enough to poll. It answers when the build was generated, how many rows it has, its columns and a few real rows, and the size of each format in bytes, all without moving the file:
