@@ -19,9 +19,9 @@ __all__ = [
     "DatabaseVersion",
     "Download",
     "Format",
+    "LicenseType",
     "MetadataColumn",
     "Outcome",
-    "LicenseType",
     "Standing",
 ]
 

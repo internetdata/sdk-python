@@ -20,9 +20,9 @@ from .models import (
     DatabaseVersion,
     Download,
     Format,
+    LicenseType,
     MetadataColumn,
     Outcome,
-    LicenseType,
     Standing,
 )
 
@@ -41,9 +41,9 @@ __all__ = [
     "Format",
     "InternetData",
     "InternetDataError",
+    "LicenseType",
     "MetadataColumn",
     "Outcome",
-    "LicenseType",
     "Standing",
     "__version__",
 ]
