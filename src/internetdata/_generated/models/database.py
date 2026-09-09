@@ -11,7 +11,6 @@ from ..models.database_license_type_type_1 import DatabaseLicenseTypeType1
 from ..models.database_license_type_type_2_type_1 import DatabaseLicenseTypeType2Type1
 from ..models.database_license_type_type_3_type_1 import DatabaseLicenseTypeType3Type1
 from ..models.database_standing import DatabaseStanding
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.database_version import DatabaseVersion
@@ -39,12 +38,12 @@ class Database:
             expires (datetime.datetime | None): A hard stop. Null when the licence has no end date, which is the normal case
                 for a rolling agreement, and when there is no licence. A rolling licence reports its turnover date in renews_at
                 instead.
+            renews_at (datetime.datetime | None): When a rolling licence next renews. Null when the licence has no defined
+                term, when expires sets a hard stop instead, and when there is no licence.
+            notice_due_at (datetime.datetime | None): The last day notice of non-renewal can be given for the term ending at
+                renews_at. Null whenever renews_at is, and when the agreement records no notice period.
             versions (list[DatabaseVersion]): Every published version of this family, oldest first. Old versions
                 are frozen rather than migrated, so both stay downloadable.
-            renews_at (datetime.datetime | None | Unset): When a rolling licence next renews. Null when the licence has no
-                defined term, when expires sets a hard stop instead, and when there is no licence.
-            notice_due_at (datetime.datetime | None | Unset): The last day notice of non-renewal can be given for the term
-                ending at renews_at. Null whenever renews_at is, and when the agreement records no notice period.
     """
 
     base: str
@@ -59,9 +58,9 @@ class Database:
     )
     starts: datetime.datetime | None
     expires: datetime.datetime | None
+    renews_at: datetime.datetime | None
+    notice_due_at: datetime.datetime | None
     versions: list[DatabaseVersion]
-    renews_at: datetime.datetime | None | Unset = UNSET
-    notice_due_at: datetime.datetime | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,26 +94,22 @@ class Database:
         else:
             expires = self.expires
 
-        versions = []
-        for versions_item_data in self.versions:
-            versions_item = versions_item_data.to_dict()
-            versions.append(versions_item)
-
-        renews_at: None | str | Unset
-        if isinstance(self.renews_at, Unset):
-            renews_at = UNSET
-        elif isinstance(self.renews_at, datetime.datetime):
+        renews_at: None | str
+        if isinstance(self.renews_at, datetime.datetime):
             renews_at = self.renews_at.isoformat()
         else:
             renews_at = self.renews_at
 
-        notice_due_at: None | str | Unset
-        if isinstance(self.notice_due_at, Unset):
-            notice_due_at = UNSET
-        elif isinstance(self.notice_due_at, datetime.datetime):
+        notice_due_at: None | str
+        if isinstance(self.notice_due_at, datetime.datetime):
             notice_due_at = self.notice_due_at.isoformat()
         else:
             notice_due_at = self.notice_due_at
+
+        versions = []
+        for versions_item_data in self.versions:
+            versions_item = versions_item_data.to_dict()
+            versions.append(versions_item)
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -127,13 +122,11 @@ class Database:
                 "license_type": license_type,
                 "starts": starts,
                 "expires": expires,
+                "renews_at": renews_at,
+                "notice_due_at": notice_due_at,
                 "versions": versions,
             }
         )
-        if renews_at is not UNSET:
-            field_dict["renews_at"] = renews_at
-        if notice_due_at is not UNSET:
-            field_dict["notice_due_at"] = notice_due_at
 
         return field_dict
 
@@ -224,17 +217,8 @@ class Database:
 
         expires = _parse_expires(d.pop("expires"))
 
-        versions = []
-        _versions = d.pop("versions")
-        for versions_item_data in _versions:
-            versions_item = DatabaseVersion.from_dict(versions_item_data)
-
-            versions.append(versions_item)
-
-        def _parse_renews_at(data: object) -> datetime.datetime | None | Unset:
+        def _parse_renews_at(data: object) -> datetime.datetime | None:
             if data is None:
-                return data
-            if isinstance(data, Unset):
                 return data
             try:
                 if not isinstance(data, str):
@@ -244,14 +228,12 @@ class Database:
                 return renews_at_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(datetime.datetime | None | Unset, data)
+            return cast(datetime.datetime | None, data)
 
-        renews_at = _parse_renews_at(d.pop("renews_at", UNSET))
+        renews_at = _parse_renews_at(d.pop("renews_at"))
 
-        def _parse_notice_due_at(data: object) -> datetime.datetime | None | Unset:
+        def _parse_notice_due_at(data: object) -> datetime.datetime | None:
             if data is None:
-                return data
-            if isinstance(data, Unset):
                 return data
             try:
                 if not isinstance(data, str):
@@ -261,9 +243,16 @@ class Database:
                 return notice_due_at_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(datetime.datetime | None | Unset, data)
+            return cast(datetime.datetime | None, data)
 
-        notice_due_at = _parse_notice_due_at(d.pop("notice_due_at", UNSET))
+        notice_due_at = _parse_notice_due_at(d.pop("notice_due_at"))
+
+        versions = []
+        _versions = d.pop("versions")
+        for versions_item_data in _versions:
+            versions_item = DatabaseVersion.from_dict(versions_item_data)
+
+            versions.append(versions_item)
 
         database = cls(
             base=base,
@@ -273,9 +262,9 @@ class Database:
             license_type=license_type,
             starts=starts,
             expires=expires,
-            versions=versions,
             renews_at=renews_at,
             notice_due_at=notice_due_at,
+            versions=versions,
         )
 
         database.additional_properties = d
