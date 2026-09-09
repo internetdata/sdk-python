@@ -26,7 +26,7 @@ from .models import (
     Standing,
 )
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 __all__ = [
     "DEFAULT_BASE_URL",
