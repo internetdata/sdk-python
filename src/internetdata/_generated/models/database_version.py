@@ -6,7 +6,7 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.database_version_formats_item import DatabaseVersionFormatsItem
+from ..models.database_format import DatabaseFormat
 
 T = TypeVar("T", bound="DatabaseVersion")
 
@@ -18,7 +18,7 @@ class DatabaseVersion:
         id (str): The versioned id. Pass this to `download`, `checksum` and `metadata`. Example: vpn_ip_v1.
         version (int):  Example: 1.
         summary (str):
-        formats (list[DatabaseVersionFormatsItem]): The formats this version is BUILT in. Asking for another is a 400,
+        formats (list[DatabaseFormat]): The formats this version is BUILT in. Asking for another is a 400,
             not a gap - the `_provider` catalogs are keyed by provider id, so no
             MMDB exists for them.
     """
@@ -26,7 +26,7 @@ class DatabaseVersion:
     id: str
     version: int
     summary: str
-    formats: list[DatabaseVersionFormatsItem]
+    formats: list[DatabaseFormat]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,7 +66,7 @@ class DatabaseVersion:
         formats = []
         _formats = d.pop("formats")
         for formats_item_data in _formats:
-            formats_item = DatabaseVersionFormatsItem(formats_item_data)
+            formats_item = DatabaseFormat(formats_item_data)
 
             formats.append(formats_item)
 

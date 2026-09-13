@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 
-class DatabaseVersionFormatsItem(StrEnum):
+class DatabaseFormat(StrEnum):
     CSVGZ = "csvgz"
     MMDB = "mmdb"
 

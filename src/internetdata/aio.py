@@ -45,8 +45,7 @@ from ._generated.api.database_v_2 import (
     list_downloads,
 )
 from ._generated.client import AuthenticatedClient
-from ._generated.models.database_checksum_v2_format import DatabaseChecksumV2Format
-from ._generated.models.download_database_v2_format import DownloadDatabaseV2Format
+from ._generated.models.database_format import DatabaseFormat
 from .errors import InternetDataError
 from .models import Database, DatabaseMetadata, Download, Format, to_metadata
 
@@ -153,7 +152,7 @@ class AsyncDatabaseApi:
                 lambda: database_checksum_v2.asyncio_detailed(
                     client=self._client,
                     id=database_id,
-                    format_=DatabaseChecksumV2Format(format),
+                    format_=DatabaseFormat(format),
                 )
             )
             return parse_body(unwrap(res), checksums_of)
@@ -186,7 +185,7 @@ class AsyncDatabaseApi:
                 lambda: download_database_v2.asyncio_detailed(
                     client=self._client,
                     id=database_id,
-                    format_=DownloadDatabaseV2Format(format),
+                    format_=DatabaseFormat(format),
                 )
             )
             return redirect_location(res)

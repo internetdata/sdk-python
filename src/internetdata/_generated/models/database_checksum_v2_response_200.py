@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.database_checksum_v2_response_200_format import DatabaseChecksumV2Response200Format
+from ..models.database_format import DatabaseFormat
 
 if TYPE_CHECKING:
     from ..models.db_checksums import DbChecksums
@@ -20,12 +20,12 @@ class DatabaseChecksumV2Response200:
     """
     Attributes:
         id (str):
-        format_ (DatabaseChecksumV2Response200Format):
+        format_ (DatabaseFormat): A file format a database version is published in. Example: mmdb.
         checksums (DbChecksums):
     """
 
     id: str
-    format_: DatabaseChecksumV2Response200Format
+    format_: DatabaseFormat
     checksums: DbChecksums
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -55,7 +55,7 @@ class DatabaseChecksumV2Response200:
         d = dict(src_dict)
         id = d.pop("id")
 
-        format_ = DatabaseChecksumV2Response200Format(d.pop("format"))
+        format_ = DatabaseFormat(d.pop("format"))
 
         checksums = DbChecksums.from_dict(d.pop("checksums"))
 

@@ -10,7 +10,7 @@ from attrs import field as _attrs_field
 from ..models.database_license_type_type_1 import DatabaseLicenseTypeType1
 from ..models.database_license_type_type_2_type_1 import DatabaseLicenseTypeType2Type1
 from ..models.database_license_type_type_3_type_1 import DatabaseLicenseTypeType3Type1
-from ..models.database_standing import DatabaseStanding
+from ..models.standing import Standing
 
 if TYPE_CHECKING:
     from ..models.database_version import DatabaseVersion
@@ -29,11 +29,12 @@ class Database:
             base (str): The family, e.g. `vpn_ip`. What a licence is held against. Example: vpn_ip.
             name (str):  Example: VPN IP.
             summary (str): One line on what the newest version contains.
-            standing (DatabaseStanding): `licensed` is a live grant, `expired` one whose term has ended, and
-                `unlicensed` a database published but never bought.
+            standing (Standing): Where your licence for a database family stands today. `licensed` is a
+                live grant, `expired` one whose term has ended, and `unlicensed` a
+                database published but never bought.
             license_type (DatabaseLicenseTypeType1 | DatabaseLicenseTypeType2Type1 | DatabaseLicenseTypeType3Type1 | None):
                 What your licence permits you to do with the data. Null when there
-                is no licence.
+                is no licence, which is every family with standing `unlicensed`.
             starts (datetime.datetime | None):
             expires (datetime.datetime | None): A hard stop. Null when the licence has no end date, which is the normal case
                 for a rolling agreement, and when there is no licence. A rolling licence reports its turnover date in renews_at
@@ -49,7 +50,7 @@ class Database:
     base: str
     name: str
     summary: str
-    standing: DatabaseStanding
+    standing: Standing
     license_type: (
         DatabaseLicenseTypeType1
         | DatabaseLicenseTypeType2Type1
@@ -141,7 +142,7 @@ class Database:
 
         summary = d.pop("summary")
 
-        standing = DatabaseStanding(d.pop("standing"))
+        standing = Standing(d.pop("standing"))
 
         def _parse_license_type(
             data: object,
