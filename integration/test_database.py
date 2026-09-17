@@ -6,7 +6,7 @@ quietly pull one of the multi-gigabyte families through CI.
 
 Nothing here hardcodes which families the key is licensed for. The organization behind the
 staging secret holds the two smallest published families and nothing else, but asserting
-their names would turn a licence change into an SDK failure; what the suite pins is the
+their names would turn a license change into an SDK failure; what the suite pins is the
 RELATION - something licensed to transfer, something unlicensed to be refused.
 """
 
@@ -64,7 +64,7 @@ def test_the_catalog_answers_the_schema_the_client_was_generated_from() -> None:
         assert family.license_type is None or family.license_type in RIGHTS, (
             f"{family.base} carries an undocumented right {family.license_type!r}"
         )
-        # A licence covers the family, and these are the ids the other calls take.
+        # A license covers the family, and these are the ids the other calls take.
         assert family.versions, f"{family.base} carries no versions"
         for version in family.versions:
             assert version.id.startswith(family.base), (
@@ -207,7 +207,7 @@ def test_a_family_the_organization_does_not_license_is_refused_cleanly() -> None
     err = caught.value
     assert err.kind == "forbidden", f"{target.id}: kind = {err.kind!r}, want 'forbidden'"
     assert err.status == 403
-    assert err.retryable is False, "a licence refusal is not worth retrying"
+    assert err.retryable is False, "a license refusal is not worth retrying"
     # The API says which refusal this is (`{"rc": "NOT_LICENSED"}`). Falling back to the
     # status means the client never read the envelope.
     assert not err.message.startswith("request failed with status"), (
@@ -266,7 +266,7 @@ class Target:
 def licensed_version(client: InternetData) -> Target:
     """The smallest thing this key may actually download, picked from the catalog.
 
-    Chosen rather than named so a licence change is not an SDK failure, and restricted to
+    Chosen rather than named so a license change is not an SDK failure, and restricted to
     a version built in `FORMAT` because that is the one the transfer tests fetch.
     """
     for family in catalog(client):
@@ -279,7 +279,7 @@ def licensed_version(client: InternetData) -> Target:
 
 
 def unlicensed_version(client: InternetData) -> Target:
-    """A real catalog id this key holds no licence for."""
+    """A real catalog id this key holds no license for."""
     for family in catalog(client):
         if family.standing == "licensed":
             continue

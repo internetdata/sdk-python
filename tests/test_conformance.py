@@ -118,7 +118,7 @@ def test_the_catalog_carries_every_standing_and_license_type_the_corpus_pins(
     assert served_rights <= set(TESTDATA["license_type"]), (
         f"undocumented license_type right in {served_rights}"
     )
-    # Null when there is no licence, which is a different answer from any of the three.
+    # Null when there is no license, which is a different answer from any of the three.
     assert [f.license_type for f in families][-1] is None
     for family in families:
         assert family.versions, f"{family.base} carries no versions"
@@ -161,7 +161,7 @@ def test_a_listing_is_never_reused_across_clients(make_client: ClientFactory) ->
     """Two keys are two organizations, and they do not see the same catalog.
 
     So there is no listing cache at all here, per instance or otherwise: a cached one
-    would be wrong the moment a licence is granted, and a shared one would show an
+    would be wrong the moment a license is granted, and a shared one would show an
     organization a family it is not allowed to know exists.
     """
     assert "a-listing-is-never-reused-across-clients" in TESTDATA["visibility"]["clientRules"]
@@ -172,7 +172,7 @@ def test_a_listing_is_never_reused_across_clients(make_client: ClientFactory) ->
     assert len(first.database.list()) == len(CATALOG)
     assert second.database.list() == [], "the second key answered from the first one's listing"
     assert len(stub.requests) == 2
-    # A repeat on the SAME client asks again too: a licence granted between two calls has
+    # A repeat on the SAME client asks again too: a license granted between two calls has
     # to show up.
     first.database.list()
     assert len(stub.requests) == 3
@@ -210,7 +210,7 @@ def test_the_api_key_reaches_the_wire_under_the_bearer_scheme(
 def test_a_keyless_client_sends_no_authorization_header(
     make_client: ClientFactory, api_key: str | None
 ) -> None:
-    """The key is optional because what this API serves without a licence is a product
+    """The key is optional because what this API serves without a license is a product
     decision, and a client that could not be built without one would have to change
     shape to follow it. What must never go out is `Bearer ` with nothing after it, which
     reads as a wrong key rather than as none.

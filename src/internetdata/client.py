@@ -55,7 +55,7 @@ class InternetData:
     Every database published today is licensed, so create a key carrying the
     `db.download` scope in the console and pass it in. The argument is optional
     nonetheless, and an absent or empty one sends no `Authorization` header at all
-    rather than an empty one: what this API serves without a licence is a product
+    rather than an empty one: what this API serves without a license is a product
     decision, not the client's to refuse.
 
     `timeout` is how long one attempt at a request may take, in seconds, body included, so a
@@ -133,7 +133,7 @@ class DatabaseApi:
         customer. Nothing is cached and nothing is reconstructed here - what you get is
         what the server sent for the key you are holding.
 
-        A licence covers a FAMILY, while a download names a version, so the ids for the
+        A license covers a FAMILY, while a download names a version, so the ids for the
         other calls come from each entry's `versions`.
         """
 

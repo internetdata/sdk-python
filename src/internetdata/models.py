@@ -37,7 +37,7 @@ Standing = Literal["licensed", "expired", "unlicensed"]
 """Where your organization stands with one database family."""
 
 LicenseType = Literal["evaluation", "standard", "redistribute"]
-"""What a licence permits you to do with the data. `None` when there is no licence."""
+"""What a license permits you to do with the data. `None` when there is no license."""
 
 Outcome = Literal["ok", "unauthorized", "denied", "expired", "unknown", "unavailable"]
 """How one download attempt ended, refusals included."""
@@ -49,7 +49,7 @@ class DatabaseVersion:
 
     Old versions are frozen rather than migrated, so several stay downloadable at once.
     `id` is what `download`, `checksums` and `metadata` take; the family `base` is what a
-    licence is held against.
+    license is held against.
     """
 
     id: str
@@ -60,7 +60,7 @@ class DatabaseVersion:
 
 @dataclass(frozen=True, slots=True)
 class Database:
-    """One database FAMILY, with your organization's licence beside it.
+    """One database FAMILY, with your organization's license beside it.
 
     A family your organization has never licensed is still listed, with `standing` set to
     `unlicensed`, so you can see what else exists. A family commissioned for a single
@@ -185,7 +185,7 @@ def to_download(body: dict[str, Any]) -> Download:
 
 
 def _datetime(value: Any) -> datetime.datetime | None:
-    """A NULLABLE wire timestamp. A licence with no end date carries `expires: null`.
+    """A NULLABLE wire timestamp. A license with no end date carries `expires: null`.
 
     `fromisoformat` only learned to read a trailing `Z` in 3.11, which is one of the
     three reasons this package floors there. A value that is neither null nor readable

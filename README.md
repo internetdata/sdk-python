@@ -38,7 +38,7 @@ with InternetData(api_key) as client:
 
 ### The catalog
 
-`list` answers database FAMILIES. A licence is held against a family, while a download names a specific version, so the ids the other calls take come from each family's `versions`:
+`list` answers database FAMILIES. A license is held against a family, while a download names a specific version, so the ids the other calls take come from each family's `versions`:
 
 ```python
 for family in client.database.list():
@@ -48,7 +48,7 @@ for family in client.database.list():
         print(version.id, version.formats)   # 'bogon_ip_v1' ('csvgz', 'mmdb')
 ```
 
-`standing` is `licensed`, `expired` or `unlicensed`, and `license_type` is what your licence lets you do with the data (`evaluation`, `standard`, `redistribute`, or `None` when there is no licence). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
+`standing` is `licensed`, `expired` or `unlicensed`, and `license_type` is what your license lets you do with the data (`evaluation`, `standard`, `redistribute`, or `None` when there is no license). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
 
 ### What is inside a build
 
