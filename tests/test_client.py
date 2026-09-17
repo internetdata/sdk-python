@@ -4,21 +4,29 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import inspect
+import time
+from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
 from helpers import (
     API,
     API_KEY,
+    CHECKSUM_PATH,
     DOWNLOADS_PATH,
     LIST_PATH,
     METADATA_PATH,
+    ClientAdapter,
     ClientFactory,
+    SlowBody,
     Stub,
     database,
+    settle,
 )
 
-from internetdata import InternetData, InternetDataError
+from internetdata import AsyncInternetData, InternetData, InternetDataError, _core
 
 METADATA = {
     "id": "bogon_ip_v1",
@@ -60,6 +68,22 @@ DOWNLOADS = {
             "created": "2026-09-04T09:00:00.000Z",
         },
     ]
+}
+
+# Far under SlowBody's three seconds, so a client that ignores its bound fails on how long
+# the call took rather than on the server giving up.
+TIMEOUT = 0.3
+# A byte every 20 ms, so no single read ever waits long enough for httpx's own bound.
+TRICKLE = 0.02
+# What starting a thread or an event loop may add to a deadline.
+SLACK = 0.25
+
+JSON_CALLS: dict[str, Callable[[ClientAdapter], Any]] = {
+    "list": lambda client: client.database.list(),
+    "metadata": lambda client: client.database.metadata("bogon_ip_v1"),
+    "checksums": lambda client: client.database.checksums("bogon_ip_v1", "csvgz"),
+    "downloads": lambda client: client.database.downloads(),
+    "download_url": lambda client: client.database.download_url("bogon_ip_v1", "csvgz"),
 }
 
 
@@ -212,6 +236,76 @@ def test_a_transport_failure_surfaces_as_a_network_error() -> None:
     assert caught.value.retryable is True
 
 
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_the_timeout_bounds_a_trickling_body_on_every_json_call(
+    make_client: ClientFactory, call: str
+) -> None:
+    with SlowBody(trickle=TRICKLE) as server:
+        client = make_client(base_url=server.url, timeout=TIMEOUT, retries=0)
+        elapsed, outcome = _timed(lambda: JSON_CALLS[call](client))
+
+    _assert_timed_out(outcome)
+    _assert_one_bound(elapsed)
+
+
+# httpx's per-read bound catches a full stall on its own, so this passes without the
+# deadline; the trickle above is what proves the deadline exists.
+def test_a_body_that_stalls_after_its_headers_is_bounded(make_client: ClientFactory) -> None:
+    with SlowBody(trickle=None) as server:
+        client = make_client(base_url=server.url, timeout=TIMEOUT, retries=0)
+        elapsed, outcome = _timed(client.database.list)
+
+    _assert_timed_out(outcome)
+    _assert_one_bound(elapsed)
+
+
+def test_a_second_call_is_held_to_the_clients_bound_too(make_client: ClientFactory) -> None:
+    with SlowBody(trickle=TRICKLE) as server:
+        client = make_client(base_url=server.url, timeout=TIMEOUT, retries=0)
+        first, first_outcome = _timed(client.database.list)
+        second, second_outcome = _timed(client.database.list)
+
+    _assert_timed_out(first_outcome)
+    _assert_one_bound(first)
+    _assert_timed_out(second_outcome)
+    _assert_one_bound(second)
+
+
+# The bound is on each ATTEMPT, so a retried call takes one bound per attempt in total.
+def test_a_timed_out_attempt_is_retried_under_a_bound_of_its_own(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    with SlowBody(trickle=TRICKLE) as server:
+        client = make_client(base_url=server.url, timeout=TIMEOUT, retries=1)
+        elapsed, outcome = _timed(client.database.list)
+
+    assert server.paths == [LIST_PATH, LIST_PATH], "a timed-out attempt was not retried"
+    _assert_timed_out(outcome)
+    assert 2 * TIMEOUT - 0.05 <= elapsed < 2 * TIMEOUT + SLACK, (
+        f"two attempts took {elapsed:.2f}s, not one bound each"
+    )
+
+
+def test_the_default_timeout_is_thirty_seconds() -> None:
+    for client in (InternetData, AsyncInternetData):
+        assert inspect.signature(client).parameters["timeout"].default == 30
+
+
+# Refused before the network, and never retried: a typo is the caller's, not a failure of
+# the server's to wait out.
+def test_an_unpublished_format_is_refused_before_any_request(make_client: ClientFactory) -> None:
+    stub = Stub({CHECKSUM_PATH: {"body": {"checksums": {"sha256": "00"}}}})
+    client = make_client(transport=stub.transport, retries=2)
+
+    started = time.monotonic()
+    with pytest.raises(ValueError, match="zip"):
+        client.database.checksums("bogon_ip_v1", "zip")
+
+    assert stub.requests == []
+    assert time.monotonic() - started < 0.5, "the refusal was retried"
+
+
 def test_the_base_url_is_overridable(make_client: ClientFactory) -> None:
     stub = Stub({LIST_PATH: {"body": {"databases": []}}})
     client = make_client(transport=stub.transport)
@@ -236,3 +330,22 @@ def test_a_value_this_client_was_not_generated_for_stays_inside_the_error_type(
 
     assert caught.value.kind == "server_error"
     assert "trial" in caught.value.message, "the message does not say which value it choked on"
+
+
+def _timed(call: Callable[[], Any]) -> tuple[float, Any]:
+    """How long `call` took to settle, and what it settled with."""
+    started = time.monotonic()
+    outcome = settle(call)
+    return time.monotonic() - started, outcome
+
+
+def _assert_timed_out(outcome: Any) -> None:
+    assert isinstance(outcome, InternetDataError), f"settled with {outcome!r}"
+    assert outcome.kind == "network", outcome
+    assert outcome.retryable is True
+
+
+def _assert_one_bound(elapsed: float) -> None:
+    assert TIMEOUT - 0.05 <= elapsed < TIMEOUT + SLACK, (
+        f"gave up after {elapsed:.2f}s against a {TIMEOUT}s bound"
+    )

@@ -10,10 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import socket
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import httpx
+import pytest
 
 from internetdata import AsyncInternetData, InternetData
 
@@ -150,6 +155,138 @@ class Stub:
             return route["body"]
         bodies = route["bodies"]
         return bodies[min(self._served(self.requests[-1].url.path) - 1, len(bodies) - 1)]
+
+
+class LocalServer:
+    """A real socket on 127.0.0.1, answering each connection's one request from a thread.
+
+    What a deadline is tested against: `MockTransport` never consults a timeout. Past
+    `MAX_REQUESTS` it stops accepting, so a retry loop that never ends waits for good instead
+    of spinning, and `settle` fails the test from outside it.
+    """
+
+    MAX_REQUESTS = 20
+
+    def __init__(self) -> None:
+        self._listener = socket.create_server(("127.0.0.1", 0))
+        self._listener.settimeout(0.05)
+        host, port = self._listener.getsockname()[:2]
+        self.url = f"http://{host}:{port}"
+        self.paths: list[str] = []
+        self.closed = threading.Event()
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.closed.set()
+        self._listener.close()
+
+    def answer(self, conn: socket.socket, path: str) -> None:
+        raise NotImplementedError
+
+    def _serve(self) -> None:
+        while not self.closed.is_set():
+            if len(self.paths) >= self.MAX_REQUESTS:
+                self.closed.wait(0.05)
+                continue
+            try:
+                conn, _ = self._listener.accept()
+            except TimeoutError:
+                continue
+            except OSError:
+                return
+            threading.Thread(target=self._handle, args=(conn,), daemon=True).start()
+
+    def _handle(self, conn: socket.socket) -> None:
+        with conn:
+            try:
+                conn.settimeout(3.0)
+                request_line = conn.recv(65536).decode("latin-1").split("\r\n", 1)[0]
+                path = request_line.split(" ")[1].split("?", 1)[0] if " " in request_line else ""
+                self.paths.append(path)
+                self.answer(conn, path)
+            except OSError:
+                return
+
+
+class SlowBody(LocalServer):
+    """Answers every request with a 200's headers and the first byte of its body, then a
+    byte every `trickle` seconds, or nothing more when that is None.
+
+    What httpx's own timeout cannot bound: it limits each read rather than the attempt, so a
+    trickle faster than the bound resets it forever. Each response gives up after
+    `for_at_most` seconds, so a client that stops honoring its bound fails its test instead
+    of hanging the suite.
+    """
+
+    def __init__(self, trickle: float | None, for_at_most: float = 3.0) -> None:
+        self._trickle = trickle
+        self._for_at_most = for_at_most
+        super().__init__()
+
+    def answer(self, conn: socket.socket, path: str) -> None:
+        give_up = time.monotonic() + self._for_at_most
+        conn.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            b"Content-Length: 100000\r\nConnection: close\r\n\r\n{"
+        )
+        gap = self._for_at_most if self._trickle is None else self._trickle
+        while not self.closed.wait(gap) and time.monotonic() < give_up:
+            if self._trickle is not None:
+                conn.sendall(b" ")
+
+
+class SlowTransfer(LocalServer):
+    """The API's `302` to a blob on this same server, and that blob in two halves with
+    `pause` seconds between them.
+
+    A pause longer than a client's timeout outlasts it twice over: in total, and as the one
+    gap between two reads. So neither a deadline over the transfer nor a bound on each read
+    can pass unseen.
+    """
+
+    BODY = bytes(range(256)) * 64
+
+    def __init__(self, pause: float) -> None:
+        self._pause = pause
+        super().__init__()
+
+    def answer(self, conn: socket.socket, path: str) -> None:
+        if path == DOWNLOAD_PATH:
+            conn.sendall(
+                f"HTTP/1.1 302 Found\r\nLocation: {self.url}/blob\r\n"
+                "Content-Length: 0\r\nConnection: close\r\n\r\n".encode()
+            )
+            return
+        half = len(self.BODY) // 2
+        conn.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+            + f"Content-Length: {len(self.BODY)}\r\nConnection: close\r\n\r\n".encode()
+            + self.BODY[:half]
+        )
+        if not self.closed.wait(self._pause):
+            conn.sendall(self.BODY[half:])
+
+
+def settle(call: Callable[[], Any], within: float = 10.0) -> Any:
+    """What `call` returned, or the exception it raised, run on a thread of its own so a
+    call that never ends fails the test instead of hanging the suite."""
+    outcome: list[Any] = []
+
+    def run() -> None:
+        try:
+            outcome.append(call())
+        except BaseException as exc:  # noqa: BLE001 - the outcome under test
+            outcome.append(exc)
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(within)
+    if worker.is_alive():
+        pytest.fail(f"the call under test did not settle within {within}s")
+    return outcome[0]
 
 
 def database(base: str, **overrides: Any) -> dict[str, Any]:

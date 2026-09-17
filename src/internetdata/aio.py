@@ -32,8 +32,8 @@ from ._core import (
     parse_body,
     part_file,
     redirect_location,
+    request_async,
     retry_delay,
-    send_async,
     storage_refusal,
     unwrap,
 )
@@ -76,6 +76,7 @@ class AsyncInternetData:
         self._client = build_client(api_key, base_url, timeout, transport)
         self._transfer = build_async_transfer_client(timeout, transport)
         self._retries = retries
+        self._timeout = timeout
         self.database = AsyncDatabaseApi(self)
 
     async def aclose(self) -> None:
@@ -128,7 +129,7 @@ class AsyncDatabaseApi:
         """
 
         async def call() -> builtins.list[Database]:
-            res = await send_async(lambda: list_databases.asyncio_detailed(client=self._client))
+            res = await request_async(list_databases, self._client, self._owner._timeout)
             return parse_body(unwrap(res), databases_of)
 
         return await self._retrying(call)
@@ -137,8 +138,8 @@ class AsyncDatabaseApi:
         """What is inside one database: freshness, row count, columns, samples and sizes."""
 
         async def call() -> DatabaseMetadata:
-            res = await send_async(
-                lambda: database_metadata_v2.asyncio_detailed(client=self._client, id=database_id)
+            res = await request_async(
+                database_metadata_v2, self._client, self._owner._timeout, id=database_id
             )
             return parse_body(unwrap(res), to_metadata)
 
@@ -148,12 +149,12 @@ class AsyncDatabaseApi:
         """Every checksum published for one database file, keyed by algorithm."""
 
         async def call() -> dict[str, str]:
-            res = await send_async(
-                lambda: database_checksum_v2.asyncio_detailed(
-                    client=self._client,
-                    id=database_id,
-                    format_=DatabaseFormat(format),
-                )
+            res = await request_async(
+                database_checksum_v2,
+                self._client,
+                self._owner._timeout,
+                id=database_id,
+                format_=DatabaseFormat(format),
             )
             return parse_body(unwrap(res), checksums_of)
 
@@ -163,8 +164,8 @@ class AsyncDatabaseApi:
         """Your organization's recent download attempts, newest first."""
 
         async def call() -> builtins.list[Download]:
-            res = await send_async(
-                lambda: list_downloads.asyncio_detailed(client=self._client, limit=limit)
+            res = await request_async(
+                list_downloads, self._client, self._owner._timeout, limit=limit
             )
             return parse_body(unwrap(res), downloads_of)
 
@@ -181,12 +182,12 @@ class AsyncDatabaseApi:
         """
 
         async def call() -> str:
-            res = await send_async(
-                lambda: download_database_v2.asyncio_detailed(
-                    client=self._client,
-                    id=database_id,
-                    format_=DatabaseFormat(format),
-                )
+            res = await request_async(
+                download_database_v2,
+                self._client,
+                self._owner._timeout,
+                id=database_id,
+                format_=DatabaseFormat(format),
             )
             return redirect_location(res)
 

@@ -27,8 +27,8 @@ from ._core import (
     parse_body,
     part_file,
     redirect_location,
+    request,
     retry_delay,
-    send,
     storage_refusal,
     unwrap,
 )
@@ -58,6 +58,10 @@ class InternetData:
     rather than an empty one: what this API serves without a licence is a product
     decision, not the client's to refuse.
 
+    `timeout` is how long one attempt at a request may take, in seconds, body included, so a
+    call that is retried can take longer in total; None means no bound, and a database
+    transfer is exempt.
+
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
     """
@@ -77,6 +81,7 @@ class InternetData:
         self._client = build_client(api_key, base_url, timeout, transport)
         self._transfer = build_transfer_client(timeout, transport)
         self._retries = retries
+        self._timeout = timeout
         self.database = DatabaseApi(self)
 
     def close(self) -> None:
@@ -133,7 +138,7 @@ class DatabaseApi:
         """
 
         def call() -> builtins.list[Database]:
-            res = send(lambda: list_databases.sync_detailed(client=self._client))
+            res = request(list_databases, self._client, self._owner._timeout)
             return parse_body(unwrap(res), databases_of)
 
         return self._retrying(call)
@@ -146,9 +151,7 @@ class DatabaseApi:
         """
 
         def call() -> DatabaseMetadata:
-            res = send(
-                lambda: database_metadata_v2.sync_detailed(client=self._client, id=database_id)
-            )
+            res = request(database_metadata_v2, self._client, self._owner._timeout, id=database_id)
             return parse_body(unwrap(res), to_metadata)
 
         return self._retrying(call)
@@ -161,12 +164,12 @@ class DatabaseApi:
         """
 
         def call() -> dict[str, str]:
-            res = send(
-                lambda: database_checksum_v2.sync_detailed(
-                    client=self._client,
-                    id=database_id,
-                    format_=DatabaseFormat(format),
-                )
+            res = request(
+                database_checksum_v2,
+                self._client,
+                self._owner._timeout,
+                id=database_id,
+                format_=DatabaseFormat(format),
             )
             return parse_body(unwrap(res), checksums_of)
 
@@ -180,7 +183,7 @@ class DatabaseApi:
         """
 
         def call() -> builtins.list[Download]:
-            res = send(lambda: list_downloads.sync_detailed(client=self._client, limit=limit))
+            res = request(list_downloads, self._client, self._owner._timeout, limit=limit)
             return parse_body(unwrap(res), downloads_of)
 
         return self._retrying(call)
@@ -196,12 +199,12 @@ class DatabaseApi:
         """
 
         def call() -> str:
-            res = send(
-                lambda: download_database_v2.sync_detailed(
-                    client=self._client,
-                    id=database_id,
-                    format_=DatabaseFormat(format),
-                )
+            res = request(
+                download_database_v2,
+                self._client,
+                self._owner._timeout,
+                id=database_id,
+                format_=DatabaseFormat(format),
             )
             return redirect_location(res)
 

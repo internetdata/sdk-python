@@ -9,6 +9,7 @@ and where it did not.
 from __future__ import annotations
 
 import gzip
+import time
 import tracemalloc
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
@@ -16,7 +17,15 @@ from pathlib import Path
 
 import httpx
 import pytest
-from helpers import API, API_KEY, DOWNLOAD_PATH, ClientAdapter, ClientFactory
+from helpers import (
+    API,
+    API_KEY,
+    DOWNLOAD_PATH,
+    ClientAdapter,
+    ClientFactory,
+    SlowTransfer,
+    settle,
+)
 
 from internetdata import InternetDataError, _core
 
@@ -333,3 +342,26 @@ def test_a_transfer_that_dies_part_way_is_not_fetched_again(
 
     assert served.paths().count("/blob") == 1, "a body that died part way was fetched again"
     assert isinstance(failure, httpx.ReadError), f"got {failure!r}"
+
+
+# A transfer runs to gigabytes and minutes, so the timeout that bounds every JSON call must
+# cut one off neither in total nor at a gap between two reads. On a real socket, because a
+# mocked transport never consults a timeout.
+@pytest.mark.parametrize("method", ["download", "download_bytes"])
+def test_a_transfer_that_outlasts_the_timeout_still_completes(
+    make_client: ClientFactory, tmp_path: Path, method: str
+) -> None:
+    timeout = 0.3
+    path = tmp_path / "slow.mmdb"
+    rest = (path,) if method == "download" else ()
+    with SlowTransfer(pause=2 * timeout) as server:
+        client = make_client(base_url=server.url, timeout=timeout, retries=0)
+        started = time.monotonic()
+        outcome = settle(lambda: getattr(client.database, method)("bogon_ip_v1", "mmdb", *rest))
+        elapsed = time.monotonic() - started
+
+    assert server.paths == [DOWNLOAD_PATH, "/blob"]
+    assert not isinstance(outcome, BaseException), f"the transfer failed: {outcome!r}"
+    assert elapsed > 2 * timeout, f"took {elapsed:.2f}s, inside the timeout, so this proves nothing"
+    held = path.read_bytes() if method == "download" else outcome
+    assert held == SlowTransfer.BODY

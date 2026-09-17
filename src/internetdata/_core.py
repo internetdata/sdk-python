@@ -1,13 +1,17 @@
-"""Plumbing the sync and the async client both need: transport wiring, response
-unwrapping, and the retry policy."""
+"""Plumbing the sync and the async client both need: transport wiring, the deadline on
+each attempt, response unwrapping, and the retry policy."""
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import contextvars
 import json
 import os
+import threading
 from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
+from types import ModuleType
 from typing import IO, Any, TypeVar, cast
 
 import httpx
@@ -19,7 +23,7 @@ from .models import Database, Download, to_database, to_download
 
 DEFAULT_BASE_URL = "https://internetdata.io"
 DEFAULT_RETRIES = 2
-DEFAULT_TIMEOUT = 10.0
+DEFAULT_TIMEOUT = 30.0
 DEFAULT_DOWNLOADS_LIMIT = 50
 
 # One chunk of a transfer, and therefore the ceiling on what a download of any size
@@ -172,8 +176,10 @@ def send(call: Callable[[], Response[Any]]) -> Response[Any]:
     something this client cannot read, which is a failed request rather than a bug in the
     caller's code, so all three become the one error type here.
 
-    The lambda does nothing but call the generated function, which is what keeps this
-    catch from swallowing a fault of our own.
+    The call does nothing but build one generated request, send it and hand the answer to
+    the generated decoder, which is what keeps this catch from swallowing a fault of our own.
+    An argument is converted before it, so a format this client does not publish is the
+    caller's `ValueError` rather than the server's failure.
     """
     try:
         return call()
@@ -187,6 +193,91 @@ async def send_async(call: Callable[[], Awaitable[Response[Any]]]) -> Response[A
         return await call()
     except (KeyError, TypeError, ValueError) as exc:
         raise malformed(exc) from exc
+
+
+def request(
+    endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
+) -> Response[Any]:
+    """`send` for one generated endpoint, one attempt of it finished within `bound` seconds,
+    or unbounded when that is None.
+
+    Assembled from the endpoint module's `_get_kwargs` and `_build_response` because its
+    `sync_detailed` sends through httpx alone, and httpx has no bound on the attempt.
+    """
+
+    def call() -> Response[Any]:
+        http = client.get_httpx_client()
+        req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
+        res = exchange(http, req, bound)
+        return cast(Response[Any], endpoint._build_response(client=client, response=res))
+
+    return send(call)
+
+
+async def request_async(
+    endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
+) -> Response[Any]:
+    """`request`, awaited."""
+
+    async def call() -> Response[Any]:
+        http = client.get_async_httpx_client()
+        req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
+        res = await exchange_async(http, req, bound)
+        return cast(Response[Any], endpoint._build_response(client=client, response=res))
+
+    return await send_async(call)
+
+
+def exchange(http: httpx.Client, req: httpx.Request, bound: float | None) -> httpx.Response:
+    """One attempt at `req`, its whole body read, finished within `bound` seconds or failed
+    as a `network` error.
+
+    httpx bounds each PHASE of a request (connect, write, every read), not the attempt, so a
+    body trickling in a byte at a time outlasts any timeout it is given. The attempt runs on
+    a thread of its own and the caller waits at most `bound` for it; one abandoned stops at
+    its next chunk, or at the per-phase bound `req` also carries.
+    """
+    if bound is None:
+        return http.send(req)
+    finished = threading.Event()
+    abandoned = threading.Event()
+    outcome: list[httpx.Response | BaseException] = []
+    context = contextvars.copy_context()
+
+    def attempt() -> None:
+        try:
+            outcome.append(context.run(_read_whole, http, req, abandoned))
+        except BaseException as exc:  # noqa: BLE001 - raised again on the caller's thread
+            outcome.append(exc)
+        finally:
+            finished.set()
+
+    threading.Thread(target=attempt, name="internetdata-attempt", daemon=True).start()
+    try:
+        if not finished.wait(bound):
+            raise _deadline_passed(bound)
+    finally:
+        abandoned.set()
+    if isinstance(outcome[0], BaseException):
+        raise outcome[0]
+    return outcome[0]
+
+
+async def exchange_async(
+    http: httpx.AsyncClient, req: httpx.Request, bound: float | None
+) -> httpx.Response:
+    """`exchange`, awaited. Cancelling the attempt closes its connection, so no thread is
+    needed to leave it behind."""
+    if bound is None:
+        return await http.send(req)
+    deadline = asyncio.timeout(bound)
+    try:
+        async with deadline:
+            return await http.send(req)
+    except TimeoutError:
+        if not deadline.expired():
+            raise
+        raise _deadline_passed(bound) from None
 
 
 def malformed(exc: Exception) -> InternetDataError:
@@ -271,6 +362,41 @@ def retry_delay(err: InternetDataError, attempt: int, retries: int) -> float | N
     if err.retry_after_seconds is not None:
         return err.retry_after_seconds
     return _BACKOFF_BASE * (2.0**attempt)
+
+
+def _read_whole(
+    http: httpx.Client, req: httpx.Request, abandoned: threading.Event
+) -> httpx.Response:
+    res = http.send(req, stream=True)
+    try:
+        if isinstance(res.stream, httpx.SyncByteStream):
+            res.stream = _Abandonable(res.stream, abandoned, req)
+        res.read()
+    finally:
+        res.close()
+    return res
+
+
+class _Abandonable(httpx.SyncByteStream):
+    def __init__(
+        self, inner: httpx.SyncByteStream, abandoned: threading.Event, req: httpx.Request
+    ) -> None:
+        self._inner = inner
+        self._abandoned = abandoned
+        self._req = req
+
+    def __iter__(self) -> Iterator[bytes]:
+        for chunk in self._inner:
+            if self._abandoned.is_set():
+                raise httpx.ReadError("abandoned once its deadline passed", request=self._req)
+            yield chunk
+
+    def close(self) -> None:
+        self._inner.close()
+
+
+def _deadline_passed(bound: float) -> InternetDataError:
+    return InternetDataError("network", f"the request did not complete within {bound:g} seconds")
 
 
 # The generated Response declares a plain MutableMapping, but always carries httpx's
