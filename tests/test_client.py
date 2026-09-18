@@ -8,6 +8,7 @@ import datetime
 import inspect
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, get_args
 
 import attrs
@@ -20,7 +21,6 @@ from helpers import (
     DOWNLOADS_PATH,
     LIST_PATH,
     METADATA_PATH,
-    ClientAdapter,
     ClientFactory,
     SlowBody,
     Stub,
@@ -100,13 +100,28 @@ TIMEOUT = 0.3
 TRICKLE = 0.02
 # What starting a thread or an event loop may add to a deadline.
 SLACK = 0.25
+# The client's bound sits far above the call's, so an override accepted and ignored fails
+# on how long the call took rather than passing on the timeout it hit anyway.
+CLIENT_TIMEOUT = 0.6
+CALL_TIMEOUT = 0.1
 
-JSON_CALLS: dict[str, Callable[[ClientAdapter], Any]] = {
-    "list": lambda client: client.database.list(),
-    "metadata": lambda client: client.database.metadata("bogon_ip_v1"),
-    "checksums": lambda client: client.database.checksums("bogon_ip_v1", "csvgz"),
-    "downloads": lambda client: client.database.downloads(),
-    "download_url": lambda client: client.database.download_url("bogon_ip_v1", "csvgz"),
+# Every call that asks the API a question, called with the keyword arguments given.
+JSON_CALLS: dict[str, Callable[..., Any]] = {
+    "list": lambda client, **kw: client.database.list(**kw),
+    "metadata": lambda client, **kw: client.database.metadata("bogon_ip_v1", **kw),
+    "checksums": lambda client, **kw: client.database.checksums("bogon_ip_v1", "csvgz", **kw),
+    "downloads": lambda client, **kw: client.database.downloads(**kw),
+    "download_url": lambda client, **kw: client.database.download_url("bogon_ip_v1", "csvgz", **kw),
+}
+
+# The two transfers, which must REFUSE a per-call timeout rather than ignore one.
+TRANSFERS: dict[str, Callable[..., Any]] = {
+    "download": lambda client, path, **kw: client.database.download(
+        "bogon_ip_v1", "csvgz", path, **kw
+    ),
+    "download_bytes": lambda client, _path, **kw: client.database.download_bytes(
+        "bogon_ip_v1", "csvgz", **kw
+    ),
 }
 
 
@@ -358,6 +373,66 @@ def test_a_timed_out_attempt_is_retried_under_a_bound_of_its_own(
     )
 
 
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_a_per_call_timeout_bounds_a_trickling_body_and_leaves_the_clients_own_alone(
+    make_client: ClientFactory, call: str
+) -> None:
+    with SlowBody(trickle=TRICKLE) as server:
+        client = make_client(base_url=server.url, timeout=CLIENT_TIMEOUT, retries=0)
+        overridden, first = _timed(lambda: JSON_CALLS[call](client, timeout=CALL_TIMEOUT))
+        default, second = _timed(lambda: JSON_CALLS[call](client))
+
+    _assert_timed_out(first)
+    _assert_bounded_by(overridden, CALL_TIMEOUT)
+    # A per-call value written onto the one httpx client every call shares passes the
+    # call above and fails this one, which is what the second call is here for.
+    _assert_timed_out(second)
+    _assert_bounded_by(default, CLIENT_TIMEOUT)
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), "30", True])
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_a_per_call_timeout_no_attempt_can_meet_is_refused_before_any_request(
+    make_client: ClientFactory, call: str, timeout: Any
+) -> None:
+    """Accepted, each of these failed the call instead, after the retries' backoff."""
+    stub = Stub({})
+    client = make_client(transport=stub.transport, retries=0)
+
+    with pytest.raises(ValueError, match="timeout"):
+        JSON_CALLS[call](client, timeout=timeout)
+
+    assert stub.requests == []
+
+
+@pytest.mark.parametrize("call", TRANSFERS)
+def test_a_transfer_refuses_a_per_call_timeout(
+    make_client: ClientFactory, call: str, tmp_path: Path
+) -> None:
+    """A transfer is exempt from the deadline, so the option is not in its signature and
+    Python refuses it for us. Accepted and quietly ignored, a caller would be told
+    nothing; honored, a bound that suits a JSON call would abandon a healthy download."""
+    stub = Stub({})
+    client = make_client(transport=stub.transport, retries=0)
+    path = tmp_path / "bogon_ip_v1.csv.gz"
+
+    with pytest.raises(TypeError, match="timeout"):
+        TRANSFERS[call](client, path, timeout=CALL_TIMEOUT)
+
+    assert stub.requests == []
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("name", JSON_CALLS)
+def test_every_json_call_takes_a_per_call_timeout(make_client: ClientFactory, name: str) -> None:
+    """The other half of the refusal above, which without this would pass just as well on
+    a surface that had never been given a per-call timeout at all."""
+    timeout = inspect.signature(getattr(make_client().client.database, name)).parameters["timeout"]
+
+    assert timeout.kind is inspect.Parameter.KEYWORD_ONLY
+    assert timeout.default is None
+
+
 def test_the_default_timeout_is_thirty_seconds() -> None:
     for client in (InternetData, AsyncInternetData):
         assert inspect.signature(client).parameters["timeout"].default == 30
@@ -433,6 +508,13 @@ def _assert_timed_out(outcome: Any) -> None:
 
 
 def _assert_one_bound(elapsed: float) -> None:
-    assert TIMEOUT - 0.05 <= elapsed < TIMEOUT + SLACK, (
-        f"gave up after {elapsed:.2f}s against a {TIMEOUT}s bound"
+    _assert_bounded_by(elapsed, TIMEOUT)
+
+
+def _assert_bounded_by(elapsed: float, bound: float) -> None:
+    """One bound's worth of waiting, with an UPPER and a LOWER limit: without the upper a
+    call that gave up at some other bound passes, and without the lower one abandoned at
+    its first chunk does."""
+    assert bound - 0.05 <= elapsed < bound + SLACK, (
+        f"gave up after {elapsed:.2f}s against a {bound}s bound"
     )

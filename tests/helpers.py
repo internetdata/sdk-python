@@ -83,32 +83,34 @@ class DatabaseAdapter:
     def __init__(self, client: InternetData | AsyncInternetData) -> None:
         self._client = client
 
-    def list(self) -> Any:
-        return self._call("list")
+    def list(self, **kwargs: Any) -> Any:
+        return self._call("list", **kwargs)
 
-    def metadata(self, database_id: str) -> Any:
-        return self._call("metadata", database_id)
+    def metadata(self, database_id: str, **kwargs: Any) -> Any:
+        return self._call("metadata", database_id, **kwargs)
 
-    def checksums(self, database_id: str, format: str) -> Any:
-        return self._call("checksums", database_id, format)
+    def checksums(self, database_id: str, format: str, **kwargs: Any) -> Any:
+        return self._call("checksums", database_id, format, **kwargs)
 
-    def downloads(self, *args: Any) -> Any:
-        return self._call("downloads", *args)
+    def downloads(self, *args: Any, **kwargs: Any) -> Any:
+        return self._call("downloads", *args, **kwargs)
 
-    def download_url(self, database_id: str, format: str) -> Any:
-        return self._call("download_url", database_id, format)
+    def download_url(self, database_id: str, format: str, **kwargs: Any) -> Any:
+        return self._call("download_url", database_id, format, **kwargs)
 
-    def download(self, database_id: str, format: str, path: Any) -> Any:
-        return self._call("download", database_id, format, path)
+    def download(self, database_id: str, format: str, path: Any, **kwargs: Any) -> Any:
+        return self._call("download", database_id, format, path, **kwargs)
 
-    def download_bytes(self, database_id: str, format: str) -> Any:
-        return self._call("download_bytes", database_id, format)
+    def download_bytes(self, database_id: str, format: str, **kwargs: Any) -> Any:
+        return self._call("download_bytes", database_id, format, **kwargs)
 
-    def _call(self, name: str, *args: Any) -> Any:
+    # Keyword arguments are forwarded untouched and none is named here: a `timeout`
+    # in this signature would swallow the TypeError a transfer must raise for one.
+    def _call(self, name: str, *args: Any, **kwargs: Any) -> Any:
         method = getattr(self._client.database, name)
         if isinstance(self._client, InternetData):
-            return method(*args)
-        return asyncio.run(method(*args))
+            return method(*args, **kwargs)
+        return asyncio.run(method(*args, **kwargs))
 
 
 class Stub:

@@ -133,11 +133,14 @@ except InternetDataError as err:
 
 `kind` is one of `bad_request`, `unauthorized`, `forbidden`, `rate_limited`, `quota_exceeded`, `server_error` or `network`. `message` is the API's own result code, passed through as it was sent, so you can switch on `NOT_LICENSED` against `LICENSE_EXPIRED` without reading the status.
 
-A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, in seconds, or pass `None` for no bound. Anything else that is not a number greater than 0 raises `ValueError` when the client is built:
+A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, in seconds, or pass `None` for no bound. Anything else that is not a number greater than 0 raises `ValueError` where it is set:
 
 ```python
 client = InternetData(api_key, timeout=10)
+catalog = client.database.list(timeout=2)
 ```
+
+From 2.3.0, `list`, `metadata`, `checksums`, `downloads` and `download_url` each take a keyword-only `timeout` in seconds, bounding each attempt at that one call in place of the client's; `None` there means the client's own rather than no bound. `download` and `download_bytes` deliberately take none and raise `TypeError` if handed one, rather than accepting it and quietly doing nothing: a transfer runs to gigabytes and minutes, so any bound that suits a JSON call would abandon a healthy download. `download_url` does take one, because minting the link is an ordinary API request - it bounds that request, not whatever you do with the link afterwards.
 
 **Changed in 2.1.0:** the default was 10 seconds, and it bounded each read of a response rather than the whole attempt, so a response trickling in slowly could run past it for as long as the server kept sending.
 
