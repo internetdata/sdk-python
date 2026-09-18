@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import contextvars
 import json
+import math
 import os
 import threading
 from collections.abc import Awaitable, Callable, Iterator
@@ -103,6 +104,30 @@ def build_async_transfer_client(
         transport=transport,
         follow_redirects=True,
     )
+
+
+def check_timeout(timeout: float | None) -> float | None:
+    """`timeout`, once it is a bound an attempt can meet.
+
+    Refused where it is SET, because nothing downstream refuses it: zero, a negative
+    number, NaN or a string reached the first call and failed it, and every call after,
+    as a retried `network` error after three seconds of backoff, or for a string as a
+    `server_error` blaming the API. Infinity is refused too, since the sync client's wait
+    cannot hold it (`OverflowError`); None is the spelling for no bound.
+    """
+    if timeout is None:
+        return None
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, int | float)
+        or not math.isfinite(timeout)
+        or timeout <= 0
+    ):
+        raise ValueError(
+            f"timeout must be a number of seconds greater than 0, or None for no bound, "
+            f"not {timeout!r}"
+        )
+    return timeout
 
 
 def storage_refusal(res: httpx.Response) -> InternetDataError:

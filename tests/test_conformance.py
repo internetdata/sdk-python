@@ -19,7 +19,7 @@ from helpers import (
     database,
 )
 
-from internetdata import InternetDataError
+from internetdata import DATABASE_FORMATS, LICENSE_TYPES, STANDINGS, InternetDataError
 
 # One live grant, one that has run out, and one never bought. Between them these cover
 # every value the corpus pins for `standing` and `license_type`.
@@ -65,21 +65,32 @@ def test_every_error_shape_maps_to_the_same_kind_in_every_language(
             assert err.retry_after_seconds == expect["retryAfterSeconds"], name
 
 
-# The one that has caught three of four bindings: 404 is a CLIENT error. Mapping
-# 400/401/403/429 by name and letting the rest fall through to a retryable server_error
-# means an unknown database id is asked for three times before failing.
-def test_a_404_is_never_retried(make_client: ClientFactory) -> None:
-    for case in TESTDATA["errors"]:
-        if case["status"] != 404:
-            continue
-        stub = Stub({METADATA_PATH: {"status": 404, "body": case["body"]}})
+# The one that has caught three of four bindings: every 4xx but a 429 carrying Retry-After
+# is the CALLER's, and classifying by an enumerated list lets the rest (the corpus's 422)
+# fall through to a retryable server_error. Asserted with retries ON and by counting
+# requests: with retries off, one request is guaranteed and a wrong classifier passes.
+def test_no_client_error_is_ever_retried(make_client: ClientFactory) -> None:
+    cases = [case for case in TESTDATA["errors"] if not case["expect"]["retryable"]]
+    assert any(case["name"] == "unlisted-4xx-is-not-retryable" for case in cases)
+
+    for case in cases:
+        stub = Stub(
+            {
+                METADATA_PATH: {
+                    "status": case["status"],
+                    "body": case["body"],
+                    "headers": case["headers"],
+                }
+            }
+        )
         client = make_client(transport=stub.transport, retries=3)
 
         with pytest.raises(InternetDataError) as caught:
             client.database.metadata("nope_v1")
 
-        assert caught.value.retryable is False, case["name"]
+        # The count first: a retried case also ends on an error, just a later one.
         assert len(stub.requests) == 1, f"{case['name']}: issued {len(stub.requests)} requests"
+        assert caught.value.kind == case["expect"]["kind"], case["name"]
 
 
 # Both arrive as 429 and the header is the only thing separating them, so a client that
@@ -126,6 +137,17 @@ def test_the_catalog_carries_every_standing_and_license_type_the_corpus_pins(
             assert set(version.formats) <= set(TESTDATA["formats"]), (
                 f"{version.id} claims a format outside the documented set"
             )
+
+
+def test_the_runtime_vocabularies_are_the_pinned_specs() -> None:
+    """The staleness pin on three hand-written Literals.
+
+    `emit.mjs` reads the corpus's lists out of the pinned spec, so a re-pin that widens a
+    vocabulary turns this red instead of leaving a published value unnamed here.
+    """
+    assert sorted(DATABASE_FORMATS) == sorted(TESTDATA["formats"])
+    assert sorted(STANDINGS) == sorted(TESTDATA["standings"])
+    assert sorted(LICENSE_TYPES) == sorted(TESTDATA["license_type"])
 
 
 # The visibility contract. A private family is one commissioned for a single customer: the

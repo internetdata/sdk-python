@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import datetime
 import inspect
@@ -9,6 +10,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+import attrs
 import httpx
 import pytest
 from helpers import (
@@ -26,7 +28,26 @@ from helpers import (
     settle,
 )
 
-from internetdata import AsyncInternetData, InternetData, InternetDataError, _core
+from internetdata import (
+    AsyncInternetData,
+    Database,
+    DatabaseMetadata,
+    DatabaseVersion,
+    Download,
+    InternetData,
+    InternetDataError,
+    MetadataColumn,
+    _core,
+)
+from internetdata._generated.models.database import Database as WireDatabase
+from internetdata._generated.models.database_metadata import (
+    DatabaseMetadata as WireDatabaseMetadata,
+)
+from internetdata._generated.models.database_metadata_column import (
+    DatabaseMetadataColumn as WireDatabaseMetadataColumn,
+)
+from internetdata._generated.models.database_version import DatabaseVersion as WireDatabaseVersion
+from internetdata._generated.models.download import Download as WireDownload
 
 METADATA = {
     "id": "bogon_ip_v1",
@@ -141,6 +162,47 @@ def test_a_licence_with_no_end_date_reads_as_none(make_client: ClientFactory) ->
 
     assert family.starts == datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
     assert family.expires is None
+    assert family.renews_at is None
+    assert family.notice_due_at is None
+
+
+def test_a_rolling_license_carries_its_renewal_dates(make_client: ClientFactory) -> None:
+    served = database(
+        "bogon_ip",
+        renews_at="2027-01-01T00:00:00.000Z",
+        notice_due_at="2026-10-02T00:00:00.000Z",
+    )
+    stub = Stub({LIST_PATH: {"body": {"databases": [served]}}})
+    client = make_client(transport=stub.transport)
+
+    family = client.database.list()[0]
+
+    assert family.renews_at == datetime.datetime(2027, 1, 1, tzinfo=datetime.UTC)
+    assert family.notice_due_at == datetime.datetime(2026, 10, 2, tzinfo=datetime.UTC)
+
+
+@pytest.mark.parametrize(
+    ("wire", "ours"),
+    [
+        (WireDatabase, Database),
+        (WireDatabaseVersion, DatabaseVersion),
+        (WireDatabaseMetadata, DatabaseMetadata),
+        (WireDatabaseMetadataColumn, MetadataColumn),
+        (WireDownload, Download),
+    ],
+)
+def test_every_field_the_pinned_spec_serves_is_on_the_model(wire: Any, ours: Any) -> None:
+    """The staleness pin on the hand-written models.
+
+    They parse the keys they name and nothing else, so a field a re-pin adds reaches the
+    generated code and `raw` while the typed model never hears of it: `renews_at` and
+    `notice_due_at` sat that way from the 2026-09-09 re-pin until 2.2.0. The generated
+    classes come from the same pinned spec, which makes them the list to check against.
+    The generator suffixes a name that shadows a builtin with `_`.
+    """
+    served = {f.name.rstrip("_") for f in attrs.fields(wire)} - {"additional_properties"}
+    modeled = {f.name for f in dataclasses.fields(ours)} - {"raw"}
+    assert served - modeled == set(), f"{ours.__name__} lacks what the spec serves"
 
 
 def test_a_database_cannot_be_mutated(make_client: ClientFactory) -> None:
@@ -290,6 +352,22 @@ def test_a_timed_out_attempt_is_retried_under_a_bound_of_its_own(
 def test_the_default_timeout_is_thirty_seconds() -> None:
     for client in (InternetData, AsyncInternetData):
         assert inspect.signature(client).parameters["timeout"].default == 30
+
+
+@pytest.mark.parametrize("client", [InternetData, AsyncInternetData])
+@pytest.mark.parametrize("timeout", [0, -1, 0.0, float("nan"), float("inf"), "30", True])
+def test_a_timeout_no_attempt_can_meet_is_refused_when_the_client_is_built(
+    client: type[InternetData | AsyncInternetData], timeout: Any
+) -> None:
+    """Accepted, each of these failed every call instead, after the retries' backoff."""
+    with pytest.raises(ValueError, match="timeout"):
+        client(API_KEY, timeout=timeout)
+
+
+@pytest.mark.parametrize("timeout", [None, 0.25, 1, 30])
+def test_a_usable_timeout_builds_a_client(timeout: float | None) -> None:
+    InternetData(API_KEY, timeout=timeout).close()
+    asyncio.run(AsyncInternetData(API_KEY, timeout=timeout).aclose())
 
 
 # Refused before the network, and never retried: a typo is the caller's, not a failure of

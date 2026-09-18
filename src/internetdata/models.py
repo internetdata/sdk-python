@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 __all__ = [
+    "DATABASE_FORMATS",
+    "LICENSE_TYPES",
+    "STANDINGS",
     "Database",
     "DatabaseMetadata",
     "DatabaseVersion",
@@ -38,6 +41,19 @@ Standing = Literal["licensed", "expired", "unlicensed"]
 
 LicenseType = Literal["evaluation", "standard", "redistribute"]
 """What a license permits you to do with the data. `None` when there is no license."""
+
+DATABASE_FORMATS: tuple[Format, ...] = get_args(Format)
+"""Every `Format`, at runtime.
+
+A `Literal` is erased to nothing a program can check against, so a format read from a
+flag, a form or a config file has these to be tested against before a call.
+"""
+
+STANDINGS: tuple[Standing, ...] = get_args(Standing)
+"""Every `Standing`, at runtime."""
+
+LICENSE_TYPES: tuple[LicenseType, ...] = get_args(LicenseType)
+"""Every `LicenseType`, at runtime. `None`, for no license, is not one of them."""
 
 Outcome = Literal["ok", "unauthorized", "denied", "expired", "unknown", "unavailable"]
 """How one download attempt ended, refusals included."""
@@ -67,6 +83,11 @@ class Database:
     customer is a different matter: it is absent from this listing entirely for everyone
     who does not license it. Absence here means "not yours to see", never "does not
     exist", so the catalog is not the same document for every key.
+
+    A rolling license carries `renews_at`, when it next renews, and `notice_due_at`, the
+    last day notice of non-renewal can be given for the term ending then. Both are None
+    when there is no license, when it has no defined term, or when `expires` sets a hard
+    stop instead; `notice_due_at` is None too when the agreement records no notice period.
     """
 
     base: str
@@ -76,6 +97,10 @@ class Database:
     license_type: LicenseType | None
     starts: datetime.datetime | None
     expires: datetime.datetime | None
+    # Keyword-only with a default, so a Database built by hand before 2.2.0 still builds;
+    # the parser always sets both.
+    renews_at: datetime.datetime | None = field(default=None, kw_only=True)
+    notice_due_at: datetime.datetime | None = field(default=None, kw_only=True)
     versions: tuple[DatabaseVersion, ...]
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -137,6 +162,8 @@ def to_database(body: dict[str, Any]) -> Database:
         license_type=body["license_type"],
         starts=_datetime(body["starts"]),
         expires=_datetime(body["expires"]),
+        renews_at=_datetime(body["renews_at"]),
+        notice_due_at=_datetime(body["notice_due_at"]),
         versions=tuple(to_version(v) for v in body["versions"]),
         raw=body,
     )

@@ -50,6 +50,8 @@ for family in client.database.list():
 
 `standing` is `licensed`, `expired` or `unlicensed`, and `license_type` is what your license lets you do with the data (`evaluation`, `standard`, `redistribute`, or `None` when there is no license). A family you have never bought is still listed, as `unlicensed`, so you can see what else exists.
 
+A rolling license also carries `renews_at`, when it next renews, and `notice_due_at`, the last day you can give notice of non-renewal for that term. Both are `None` when there is no license, when it has no defined term, or when `expires` sets a hard stop instead. `DATABASE_FORMATS`, `STANDINGS` and `LICENSE_TYPES` hold the published values at runtime, for checking one that came from a flag or a form before you make a call.
+
 ### What is inside a build
 
 `metadata` is cheap enough to poll. It answers when the build was generated, how many rows it has, its columns and a few real rows, and the size of each format in bytes, all without moving the file:
@@ -131,13 +133,15 @@ except InternetDataError as err:
 
 `kind` is one of `bad_request`, `unauthorized`, `forbidden`, `rate_limited`, `quota_exceeded`, `server_error` or `network`. `message` is the API's own result code, passed through as it was sent, so you can switch on `NOT_LICENSED` against `LICENSE_EXPIRED` without reading the status.
 
-A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, in seconds, or pass `None` for no bound:
+A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, in seconds, or pass `None` for no bound. Anything else that is not a number greater than 0 raises `ValueError` when the client is built:
 
 ```python
 client = InternetData(api_key, timeout=10)
 ```
 
 **Changed in 2.1.0:** the default was 10 seconds, and it bounded each read of a response rather than the whole attempt, so a response trickling in slowly could run past it for as long as the server kept sending.
+
+**Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
 
 Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit is the API facing a traffic burst, and retrying later works; a spent quota needs your allowance raised or the window to roll over. The library retries rate limits for you, and server and network failures, but never a spent quota or anything else you sent.
 

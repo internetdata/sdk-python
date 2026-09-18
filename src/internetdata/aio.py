@@ -26,6 +26,7 @@ from ._core import (
     assert_whole_transfer,
     build_async_transfer_client,
     build_client,
+    check_timeout,
     checksums_of,
     databases_of,
     downloads_of,
@@ -73,6 +74,7 @@ class AsyncInternetData:
         timeout: float | None = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
+        timeout = check_timeout(timeout)
         self._client = build_client(api_key, base_url, timeout, transport)
         self._transfer = build_async_transfer_client(timeout, transport)
         self._retries = retries

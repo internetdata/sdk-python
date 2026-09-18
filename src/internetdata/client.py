@@ -21,6 +21,7 @@ from ._core import (
     assert_whole_transfer,
     build_client,
     build_transfer_client,
+    check_timeout,
     checksums_of,
     databases_of,
     downloads_of,
@@ -60,7 +61,8 @@ class InternetData:
 
     `timeout` is how long one attempt at a request may take, in seconds, body included, so a
     call that is retried can take longer in total; None means no bound, and a database
-    transfer is exempt.
+    transfer is exempt. Anything else that is not a finite number greater than 0 is a
+    `ValueError` here, rather than a failure of every call.
 
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
@@ -78,6 +80,7 @@ class InternetData:
         timeout: float | None = DEFAULT_TIMEOUT,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        timeout = check_timeout(timeout)
         self._client = build_client(api_key, base_url, timeout, transport)
         self._transfer = build_transfer_client(timeout, transport)
         self._retries = retries

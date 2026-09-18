@@ -15,6 +15,9 @@ from .aio import AsyncDatabaseApi, AsyncInternetData
 from .client import DatabaseApi, InternetData
 from .errors import ErrorKind, InternetDataError
 from .models import (
+    DATABASE_FORMATS,
+    LICENSE_TYPES,
+    STANDINGS,
     Database,
     DatabaseMetadata,
     DatabaseVersion,
@@ -26,10 +29,13 @@ from .models import (
     Standing,
 )
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 __all__ = [
+    "DATABASE_FORMATS",
     "DEFAULT_BASE_URL",
+    "LICENSE_TYPES",
+    "STANDINGS",
     "AsyncDatabaseApi",
     "AsyncInternetData",
     "Database",
