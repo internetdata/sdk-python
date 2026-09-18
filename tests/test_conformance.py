@@ -200,6 +200,23 @@ def test_a_listing_is_never_reused_across_clients(make_client: ClientFactory) ->
     assert len(stub.requests) == 3
 
 
+# Each visibility rule the corpus names, and the test above that holds it. The three tests
+# each check that their own rule is still in the corpus; this checks the other direction,
+# so a rule added to the corpus fails here until something in this module holds it.
+VISIBILITY_RULES = {
+    "listing-is-returned-as-served": test_the_listing_is_returned_exactly_as_served,
+    "no-catalog-is-compiled-into-the-client": test_no_catalog_is_compiled_into_the_client,
+    "a-listing-is-never-reused-across-clients": test_a_listing_is_never_reused_across_clients,
+}
+
+
+def test_every_visibility_rule_in_the_corpus_is_held_here() -> None:
+    rules = TESTDATA["visibility"]["clientRules"]
+    assert rules, "the corpus pins no visibility rules"
+    unheld = sorted(set(rules) - set(VISIBILITY_RULES))
+    assert unheld == [], f"the corpus adds {unheld} and this suite does not check it"
+
+
 def test_checksums_unwrap_past_the_envelope(make_client: ClientFactory) -> None:
     """`checksums` nests under a key, beside `id` and `format`.
 

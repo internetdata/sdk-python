@@ -8,7 +8,7 @@ import datetime
 import inspect
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, get_args
 
 import attrs
 import httpx
@@ -37,6 +37,7 @@ from internetdata import (
     InternetData,
     InternetDataError,
     MetadataColumn,
+    Outcome,
     _core,
 )
 from internetdata._generated.models.database import Database as WireDatabase
@@ -48,6 +49,7 @@ from internetdata._generated.models.database_metadata_column import (
 )
 from internetdata._generated.models.database_version import DatabaseVersion as WireDatabaseVersion
 from internetdata._generated.models.download import Download as WireDownload
+from internetdata._generated.models.download_outcome import DownloadOutcome as WireDownloadOutcome
 
 METADATA = {
     "id": "bogon_ip_v1",
@@ -203,6 +205,13 @@ def test_every_field_the_pinned_spec_serves_is_on_the_model(wire: Any, ours: Any
     served = {f.name.rstrip("_") for f in attrs.fields(wire)} - {"additional_properties"}
     modeled = {f.name for f in dataclasses.fields(ours)} - {"raw"}
     assert served - modeled == set(), f"{ours.__name__} lacks what the spec serves"
+
+
+def test_the_outcome_vocabulary_is_the_pinned_specs() -> None:
+    """The staleness pin on `Outcome`, the one hand-written Literal the corpus does not
+    carry: the generated enum comes from the same pinned spec, so a re-pin that adds an
+    outcome turns this red instead of leaving the type a member short."""
+    assert sorted(get_args(Outcome)) == sorted(member.value for member in WireDownloadOutcome)
 
 
 def test_a_database_cannot_be_mutated(make_client: ClientFactory) -> None:
