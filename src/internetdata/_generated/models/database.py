@@ -21,26 +21,26 @@ T = TypeVar("T", bound="Database")
 
 @_attrs_define
 class Database:
-    """One database FAMILY, with your organization's licence beside it. A
-    licence covers the family, while a download names a specific version,
+    """One database FAMILY, with your organization's license beside it. A
+    license covers the family, while a download names a specific version,
     so the ids passed to `download` and `checksum` come from `versions`.
 
         Attributes:
-            base (str): The family, e.g. `vpn_ip`. What a licence is held against. Example: vpn_ip.
+            base (str): The family, e.g. `vpn_ip`. What a license is held against. Example: vpn_ip.
             name (str):  Example: VPN IP.
             summary (str): One line on what the newest version contains.
-            standing (Standing): Where your licence for a database family stands today. `licensed` is a
+            standing (Standing): Where your license for a database family stands today. `licensed` is a
                 live grant, `expired` one whose term has ended, and `unlicensed` a
                 database published but never bought.
             license_type (DatabaseLicenseTypeType1 | DatabaseLicenseTypeType2Type1 | DatabaseLicenseTypeType3Type1 | None):
-                What your licence permits you to do with the data. Null when there
-                is no licence, which is every family with standing `unlicensed`.
+                What your license permits you to do with the data. Null when there
+                is no license, which is every family with standing `unlicensed`.
             starts (datetime.datetime | None):
-            expires (datetime.datetime | None): A hard stop. Null when the licence has no end date, which is the normal case
-                for a rolling agreement, and when there is no licence. A rolling licence reports its turnover date in renews_at
+            expires (datetime.datetime | None): A hard stop. Null when the license has no end date, which is the normal case
+                for a rolling agreement, and when there is no license. A rolling license reports its turnover date in renews_at
                 instead.
-            renews_at (datetime.datetime | None): When a rolling licence next renews. Null when the licence has no defined
-                term, when expires sets a hard stop instead, and when there is no licence.
+            renews_at (datetime.datetime | None): When a rolling license next renews. Null when the license has no defined
+                term, when expires sets a hard stop instead, and when there is no license.
             notice_due_at (datetime.datetime | None): The last day notice of non-renewal can be given for the term ending at
                 renews_at. Null whenever renews_at is, and when the agreement records no notice period.
             versions (list[DatabaseVersion]): Every published version of this family, oldest first. Old versions

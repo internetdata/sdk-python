@@ -56,7 +56,7 @@ def sync_detailed(
 ) -> Response[Error | ListDatabasesResponse200]:
     """List
 
-     The whole published catalog, with your organization's licence beside
+     The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
 
@@ -83,7 +83,7 @@ def sync(
 ) -> Error | ListDatabasesResponse200 | None:
     """List
 
-     The whole published catalog, with your organization's licence beside
+     The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
 
@@ -106,7 +106,7 @@ async def asyncio_detailed(
 ) -> Response[Error | ListDatabasesResponse200]:
     """List
 
-     The whole published catalog, with your organization's licence beside
+     The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
 
@@ -131,7 +131,7 @@ async def asyncio(
 ) -> Error | ListDatabasesResponse200 | None:
     """List
 
-     The whole published catalog, with your organization's licence beside
+     The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
 
