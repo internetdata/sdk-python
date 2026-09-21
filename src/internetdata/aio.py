@@ -21,7 +21,13 @@ from ._core import (
     DEFAULT_DOWNLOADS_LIMIT,
     DEFAULT_RETRIES,
     DEFAULT_TIMEOUT,
+    DEVICE_CODE_GRANT,
+    OAUTH_DEVICE_AUTHORIZATION_PATH,
+    OAUTH_METADATA_PATH,
+    OAUTH_REVOKE_PATH,
+    OAUTH_TOKEN_PATH,
     TRANSFER_CHUNK_BYTES,
+    AsyncClock,
     as_error,
     assert_whole_transfer,
     build_async_transfer_client,
@@ -30,6 +36,8 @@ from ._core import (
     checksums_of,
     databases_of,
     downloads_of,
+    oauth_body,
+    oauth_request_async,
     parse_body,
     part_file,
     redirect_location,
@@ -47,10 +55,22 @@ from ._generated.api.database_v_2 import (
 )
 from ._generated.client import AuthenticatedClient
 from ._generated.models.database_format import DatabaseFormat
-from .errors import InternetDataError
-from .models import Database, DatabaseMetadata, Download, Format, to_metadata
+from .errors import InternetDataError, OauthError, OauthExpiredTokenError
+from .models import (
+    Database,
+    DatabaseMetadata,
+    DeviceAuthorization,
+    Download,
+    Format,
+    OauthMetadata,
+    TokenResponse,
+    to_device_authorization,
+    to_metadata,
+    to_oauth_metadata,
+    to_token_response,
+)
 
-__all__ = ["AsyncDatabaseApi", "AsyncInternetData"]
+__all__ = ["AsyncDatabaseApi", "AsyncInternetData", "AsyncOauthApi"]
 
 T = TypeVar("T")
 
@@ -63,7 +83,10 @@ class AsyncInternetData:
     """
 
     database: AsyncDatabaseApi
-    """The licensed database catalog and downloads, which is the whole API."""
+    """The licensed database catalog and downloads."""
+
+    oauth: AsyncOauthApi
+    """Signing a person in with OAuth, to hand a program on their machine one of their keys."""
 
     def __init__(
         self,
@@ -80,6 +103,7 @@ class AsyncInternetData:
         self._retries = retries
         self._timeout = timeout
         self.database = AsyncDatabaseApi(self)
+        self.oauth = AsyncOauthApi(self)
 
     async def aclose(self) -> None:
         await self._client.get_async_httpx_client().aclose()
@@ -300,3 +324,106 @@ class AsyncDatabaseApi:
 
     async def _retrying(self, call: Callable[[], Awaitable[T]]) -> T:
         return await self._owner._retrying(call, self._owner._retries)
+
+
+class AsyncOauthApi:
+    """`OauthApi`, for asyncio. Cancelling the task stops a poll's wait and any request in
+    flight at once, and surfaces as `asyncio.CancelledError`."""
+
+    def __init__(self, owner: AsyncInternetData) -> None:
+        self._owner = owner
+        self._clock = AsyncClock()
+
+    async def metadata(self, *, timeout: float | None = None) -> OauthMetadata:
+        """The authorization server's discovery document."""
+
+        async def call() -> OauthMetadata:
+            res = await self._send("GET", OAUTH_METADATA_PATH, None, timeout)
+            return to_oauth_metadata(oauth_body(res), res.status_code)
+
+        return await self._owner._retrying(call, self._owner._retries)
+
+    async def device_authorization(
+        self,
+        client_id: str,
+        *,
+        scope: str | None = None,
+        resource: str | None = None,
+        timeout: float | None = None,
+    ) -> DeviceAuthorization:
+        """Start a device sign-in; see `OauthApi.device_authorization`."""
+        form = {"client_id": client_id}
+        if scope is not None:
+            form["scope"] = scope
+        if resource is not None:
+            form["resource"] = resource
+
+        async def call() -> DeviceAuthorization:
+            res = await self._send("POST", OAUTH_DEVICE_AUTHORIZATION_PATH, form, timeout)
+            return to_device_authorization(oauth_body(res), res.status_code)
+
+        return await self._owner._retrying(call, self._owner._retries)
+
+    async def exchange_device_code(
+        self, client_id: str, device_code: str, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Redeem an approved device code, once; see `OauthApi.exchange_device_code`."""
+        form = {"grant_type": DEVICE_CODE_GRANT, "device_code": device_code, "client_id": client_id}
+        return await self._exchange(form, timeout)
+
+    async def exchange_refresh_token(
+        self, client_id: str, refresh_token: str, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Trade a refresh token for a new pair, once; see `OauthApi.exchange_refresh_token`."""
+        form = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+        }
+        return await self._exchange(form, timeout)
+
+    async def revoke(self, client_id: str, token: str, *, timeout: float | None = None) -> None:
+        """End a token; revoking the refresh token signs the machine out."""
+
+        async def call() -> None:
+            form = {"token": token, "client_id": client_id}
+            await self._send("POST", OAUTH_REVOKE_PATH, form, timeout)
+
+        await self._owner._retrying(call, self._owner._retries)
+
+    async def poll_device_token(
+        self, client_id: str, device: DeviceAuthorization, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Wait for the person to approve a device sign-in; see `OauthApi.poll_device_token`.
+        Cancel the task to stop waiting."""
+        # Refused before the first wait, not after it.
+        check_timeout(timeout)
+        interval = device.interval if device.interval >= 1 else 5
+        deadline = self._clock.now() + device.expires_in
+        while True:
+            await self._clock.sleep(interval)
+            if self._clock.now() >= deadline:
+                raise OauthExpiredTokenError()
+            try:
+                return await self.exchange_device_code(
+                    client_id, device.device_code, timeout=timeout
+                )
+            except OauthError as err:
+                # RFC 8628: slow_down widens the interval for every later request, not the next.
+                if err.error_code == "slow_down":
+                    interval += 5
+                elif err.error_code != "authorization_pending":
+                    raise
+
+    async def _exchange(self, form: dict[str, str], timeout: float | None) -> TokenResponse:
+        async def call() -> TokenResponse:
+            res = await self._send("POST", OAUTH_TOKEN_PATH, form, timeout)
+            return to_token_response(oauth_body(res), res.status_code)
+
+        return await self._owner._retrying(call, 0)
+
+    async def _send(
+        self, method: str, path: str, form: dict[str, str] | None, timeout: float | None
+    ) -> httpx.Response:
+        bound = self._owner._bound(timeout)
+        return await oauth_request_async(self._owner._client, method, path, form, bound)

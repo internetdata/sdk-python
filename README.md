@@ -17,7 +17,7 @@ Requires Python 3.11 or newer. Type hints are included, and the package ships `p
 
 ## Usage
 
-Every call needs an API key carrying the `db.download` scope. Create one in the console, then:
+Every database call needs an API key carrying the `db.download` scope. Create one in the console, then:
 
 ```python
 import os
@@ -147,6 +147,27 @@ From 2.3.0, `list`, `metadata`, `checksums`, `downloads` and `download_url` each
 **Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
 
 Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit is the API facing a traffic burst, and retrying later works; a spent quota needs your allowance raised or the window to roll over. The library retries rate limits for you, and server and network failures, but never a spent quota or anything else you sent.
+
+### Sign in with OAuth (device flow)
+
+A program running on someone's own machine can let them sign in with a browser and pick one of their API keys, instead of asking them to paste it:
+
+```python
+from internetdata import InternetData
+
+with InternetData() as signin:
+    device = signin.oauth.device_authorization(
+        "your-client-id", scope="account.read apikeys.read apikeys.reveal"
+    )
+    print(f"Open {device.verification_uri} and enter {device.user_code}")
+    tokens = signin.oauth.poll_device_token("your-client-id", device)
+
+if tokens.apikey is None:
+    raise SystemExit("No API key was picked")
+client = InternetData(tokens.apikey)
+```
+
+A refusal raises `OauthAccessDeniedError` and a code that ran out raises `OauthExpiredTokenError`, and client IDs are issued on request from support@internetdata.io. `client.oauth.revoke("your-client-id", tokens.refresh_token)` signs the machine out.
 
 ## Other Libraries
 

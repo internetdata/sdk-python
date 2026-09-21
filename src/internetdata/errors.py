@@ -9,7 +9,13 @@ from typing import Any, Literal
 
 import httpx
 
-__all__ = ["ErrorKind", "InternetDataError"]
+__all__ = [
+    "ErrorKind",
+    "InternetDataError",
+    "OauthAccessDeniedError",
+    "OauthError",
+    "OauthExpiredTokenError",
+]
 
 ErrorKind = Literal[
     "bad_request",
@@ -61,8 +67,61 @@ class InternetDataError(Exception):
 
     def __repr__(self) -> str:
         return (
-            f"InternetDataError(kind={self.kind!r}, status={self.status!r}, message={str(self)!r})"
+            f"{type(self).__name__}(kind={self.kind!r}, status={self.status!r}, "
+            f"message={str(self)!r})"
         )
+
+
+class OauthError(InternetDataError):
+    """The authorization server refusing an OAuth request, such as `slow_down` or
+    `invalid_grant`. Never retryable: every token exchange spends what it presents.
+
+    Its `kind` follows the status like any response's, so a 401 here is `unauthorized` and
+    means an unregistered `client_id`, never the API key, which these requests do not carry.
+    """
+
+    error_code: str
+    """The server's code, kept as sent."""
+    error_description: str | None
+    """The server's explanation, when it sent one."""
+
+    def __init__(
+        self, error_code: str, error_description: str | None = None, status: int | None = None
+    ) -> None:
+        kind = (
+            "bad_request" if status is None else error_from_response(status, _NO_HEADERS, None).kind
+        )
+        message = error_code if error_description is None else f"{error_code}: {error_description}"
+        super().__init__(kind, message, status)
+        self.error_code = error_code
+        self.error_description = error_description
+
+    @property
+    def retryable(self) -> bool:
+        return False
+
+
+class OauthAccessDeniedError(OauthError):
+    """The person refused the sign-in. Its device code is spent, so a new attempt starts over."""
+
+    def __init__(self, error_description: str | None = None, status: int | None = None) -> None:
+        super().__init__("access_denied", error_description, status)
+
+
+class OauthExpiredTokenError(OauthError):
+    """The device code is no longer valid: it expired, or was already used or refused. A poll
+    that outlives the code raises this itself, with a `status` of None."""
+
+    def __init__(self, error_description: str | None = None, status: int | None = None) -> None:
+        super().__init__("expired_token", error_description, status)
+
+
+def oauth_error_from(error_code: str, error_description: str | None, status: int) -> OauthError:
+    if error_code == "access_denied":
+        return OauthAccessDeniedError(error_description, status)
+    if error_code == "expired_token":
+        return OauthExpiredTokenError(error_description, status)
+    return OauthError(error_code, error_description, status)
 
 
 def error_from_response(status: int, headers: httpx.Headers, body: Any) -> InternetDataError:
@@ -90,6 +149,9 @@ def error_from_response(status: int, headers: httpx.Headers, body: Any) -> Inter
     if 400 <= status < 500:
         return InternetDataError("bad_request", message, status)
     return InternetDataError("server_error", message, status)
+
+
+_NO_HEADERS = httpx.Headers()
 
 
 def _message_of(body: Any) -> str | None:

@@ -16,7 +16,13 @@ from ._core import (
     DEFAULT_DOWNLOADS_LIMIT,
     DEFAULT_RETRIES,
     DEFAULT_TIMEOUT,
+    DEVICE_CODE_GRANT,
+    OAUTH_DEVICE_AUTHORIZATION_PATH,
+    OAUTH_METADATA_PATH,
+    OAUTH_REVOKE_PATH,
+    OAUTH_TOKEN_PATH,
     TRANSFER_CHUNK_BYTES,
+    Clock,
     as_error,
     assert_whole_transfer,
     build_client,
@@ -25,6 +31,8 @@ from ._core import (
     checksums_of,
     databases_of,
     downloads_of,
+    oauth_body,
+    oauth_request,
     parse_body,
     part_file,
     redirect_location,
@@ -42,10 +50,22 @@ from ._generated.api.database_v_2 import (
 )
 from ._generated.client import AuthenticatedClient
 from ._generated.models.database_format import DatabaseFormat
-from .errors import InternetDataError
-from .models import Database, DatabaseMetadata, Download, Format, to_metadata
+from .errors import InternetDataError, OauthError, OauthExpiredTokenError
+from .models import (
+    Database,
+    DatabaseMetadata,
+    DeviceAuthorization,
+    Download,
+    Format,
+    OauthMetadata,
+    TokenResponse,
+    to_device_authorization,
+    to_metadata,
+    to_oauth_metadata,
+    to_token_response,
+)
 
-__all__ = ["DatabaseApi", "InternetData"]
+__all__ = ["DatabaseApi", "InternetData", "OauthApi"]
 
 T = TypeVar("T")
 
@@ -57,21 +77,24 @@ class InternetData:
     `db.download` scope in the console and pass it in. The argument is optional
     nonetheless, and an absent or empty one sends no `Authorization` header at all
     rather than an empty one: what this API serves without a license is a product
-    decision, not the client's to refuse.
+    decision, not the client's to refuse. `oauth` needs no key at all.
 
     `timeout` is how long one attempt at a request may take, in seconds, body included, so a
     call that is retried can take longer in total; None means no bound, and a database
-    transfer is exempt. Every `database` call but the two transfers also takes `timeout`,
-    which overrides the client's for that call alone. Anything else that is not a finite
-    number greater than 0 is a `ValueError` where it is set, rather than a failure of every
-    call.
+    transfer is exempt. Every `oauth` request and every `database` call but the two
+    transfers also takes `timeout`, which overrides the client's for that call alone.
+    Anything else that is not a finite number greater than 0 is a `ValueError` where it is
+    set, rather than a failure of every call.
 
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
     """
 
     database: DatabaseApi
-    """The licensed database catalog and downloads, which is the whole API."""
+    """The licensed database catalog and downloads."""
+
+    oauth: OauthApi
+    """Signing a person in with OAuth, to hand a program on their machine one of their keys."""
 
     def __init__(
         self,
@@ -88,6 +111,7 @@ class InternetData:
         self._retries = retries
         self._timeout = timeout
         self.database = DatabaseApi(self)
+        self.oauth = OauthApi(self)
 
     def close(self) -> None:
         self._client.get_httpx_client().close()
@@ -312,3 +336,132 @@ class DatabaseApi:
 
     def _retrying(self, call: Callable[[], T]) -> T:
         return self._owner._retrying(call, self._owner._retries)
+
+
+class OauthApi:
+    """Signing a person in with the OAuth device flow, so a program running on their own
+    machine can be handed one of their API keys instead of asking them to paste it.
+
+    No request here carries this client's API key, and none needs one: build the client
+    with no key to sign in, then a second one with the key the sign-in hands over. The
+    `client_id` is your registered one, issued on request from support@internetdata.io.
+
+    `metadata`, `device_authorization` and `revoke` are retried like a lookup. The token
+    exchanges are sent exactly once, because the server spends what they present. A
+    refusal is an `OauthError` and is never retried.
+    """
+
+    def __init__(self, owner: InternetData) -> None:
+        self._owner = owner
+        self._clock = Clock()
+
+    def metadata(self, *, timeout: float | None = None) -> OauthMetadata:
+        """The authorization server's discovery document."""
+
+        def call() -> OauthMetadata:
+            res = self._send("GET", OAUTH_METADATA_PATH, None, timeout)
+            return to_oauth_metadata(oauth_body(res), res.status_code)
+
+        return self._owner._retrying(call, self._owner._retries)
+
+    def device_authorization(
+        self,
+        client_id: str,
+        *,
+        scope: str | None = None,
+        resource: str | None = None,
+        timeout: float | None = None,
+    ) -> DeviceAuthorization:
+        """Start a device sign-in. Show the person `verification_uri` and `user_code`, then
+        pass the answer to `poll_device_token`.
+
+        `scope` is one space-delimited string, narrowed by the server to what `client_id`
+        may ask for. Under a burst the server refuses with the `OauthError` `slow_down`.
+        """
+        form = {"client_id": client_id}
+        if scope is not None:
+            form["scope"] = scope
+        if resource is not None:
+            form["resource"] = resource
+
+        def call() -> DeviceAuthorization:
+            res = self._send("POST", OAUTH_DEVICE_AUTHORIZATION_PATH, form, timeout)
+            return to_device_authorization(oauth_body(res), res.status_code)
+
+        return self._owner._retrying(call, self._owner._retries)
+
+    def exchange_device_code(
+        self, client_id: str, device_code: str, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Redeem an approved device code, once. Until the person approves it the server
+        refuses with the `OauthError` `authorization_pending`; `poll_device_token` does the
+        waiting for you.
+        """
+        form = {"grant_type": DEVICE_CODE_GRANT, "device_code": device_code, "client_id": client_id}
+        return self._exchange(form, timeout)
+
+    def exchange_refresh_token(
+        self, client_id: str, refresh_token: str, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Trade a refresh token for a new pair, once: the server spends the old one before
+        it mints the new. The answer never carries `apikey`, only `apikey_id`.
+        """
+        form = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+        }
+        return self._exchange(form, timeout)
+
+    def revoke(self, client_id: str, token: str, *, timeout: float | None = None) -> None:
+        """End a token. A refresh token ends the whole sign-in and every token it issued, so
+        revoking it is how a program signs the machine out."""
+
+        def call() -> None:
+            self._send("POST", OAUTH_REVOKE_PATH, {"token": token, "client_id": client_id}, timeout)
+
+        self._owner._retrying(call, self._owner._retries)
+
+    def poll_device_token(
+        self, client_id: str, device: DeviceAuthorization, *, timeout: float | None = None
+    ) -> TokenResponse:
+        """Wait for the person to approve a device sign-in, and return its tokens.
+
+        Waits `device.interval` seconds (5 when that is below 1) before EVERY request, the
+        first included, and 5 more for the rest of the call each time the server answers
+        `slow_down`. Ends at the first answer that is neither: a refusal raises
+        `OauthAccessDeniedError`, a code that ran out `OauthExpiredTokenError`, as does
+        outliving `device.expires_in` counted from this call (with a `status` of None), and
+        any other failure is raised as it came. `timeout` bounds each request, not the poll.
+
+        Blocks the calling thread until one of those; the sync client has no way to cancel
+        it sooner.
+        """
+        # Refused before the first wait, not after it.
+        check_timeout(timeout)
+        interval = device.interval if device.interval >= 1 else 5
+        deadline = self._clock.now() + device.expires_in
+        while True:
+            self._clock.sleep(interval)
+            if self._clock.now() >= deadline:
+                raise OauthExpiredTokenError()
+            try:
+                return self.exchange_device_code(client_id, device.device_code, timeout=timeout)
+            except OauthError as err:
+                # RFC 8628: slow_down widens the interval for every later request, not the next.
+                if err.error_code == "slow_down":
+                    interval += 5
+                elif err.error_code != "authorization_pending":
+                    raise
+
+    def _exchange(self, form: dict[str, str], timeout: float | None) -> TokenResponse:
+        def call() -> TokenResponse:
+            res = self._send("POST", OAUTH_TOKEN_PATH, form, timeout)
+            return to_token_response(oauth_body(res), res.status_code)
+
+        return self._owner._retrying(call, 0)
+
+    def _send(
+        self, method: str, path: str, form: dict[str, str] | None, timeout: float | None
+    ) -> httpx.Response:
+        return oauth_request(self._owner._client, method, path, form, self._owner._bound(timeout))

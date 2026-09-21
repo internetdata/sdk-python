@@ -11,9 +11,15 @@ what the catalog does and does not show you.
 """
 
 from ._core import DEFAULT_BASE_URL
-from .aio import AsyncDatabaseApi, AsyncInternetData
-from .client import DatabaseApi, InternetData
-from .errors import ErrorKind, InternetDataError
+from .aio import AsyncDatabaseApi, AsyncInternetData, AsyncOauthApi
+from .client import DatabaseApi, InternetData, OauthApi
+from .errors import (
+    ErrorKind,
+    InternetDataError,
+    OauthAccessDeniedError,
+    OauthError,
+    OauthExpiredTokenError,
+)
 from .models import (
     DATABASE_FORMATS,
     LICENSE_TYPES,
@@ -21,15 +27,18 @@ from .models import (
     Database,
     DatabaseMetadata,
     DatabaseVersion,
+    DeviceAuthorization,
     Download,
     Format,
     LicenseType,
     MetadataColumn,
+    OauthMetadata,
     Outcome,
     Standing,
+    TokenResponse,
 )
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 
 __all__ = [
     "DATABASE_FORMATS",
@@ -38,10 +47,12 @@ __all__ = [
     "STANDINGS",
     "AsyncDatabaseApi",
     "AsyncInternetData",
+    "AsyncOauthApi",
     "Database",
     "DatabaseApi",
     "DatabaseMetadata",
     "DatabaseVersion",
+    "DeviceAuthorization",
     "Download",
     "ErrorKind",
     "Format",
@@ -49,7 +60,13 @@ __all__ = [
     "InternetDataError",
     "LicenseType",
     "MetadataColumn",
+    "OauthAccessDeniedError",
+    "OauthApi",
+    "OauthError",
+    "OauthExpiredTokenError",
+    "OauthMetadata",
     "Outcome",
     "Standing",
+    "TokenResponse",
     "__version__",
 ]

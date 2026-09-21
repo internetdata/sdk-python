@@ -15,12 +15,13 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, NoReturn, Self
 
 import httpx
 import pytest
 
 from internetdata import AsyncInternetData, InternetData
+from internetdata._core import AsyncClock, Clock
 
 TESTDATA: dict[str, Any] = json.loads(
     (Path(__file__).resolve().parent.parent / "testdata" / "testdata.json").read_text()
@@ -69,6 +70,7 @@ class ClientAdapter:
             InternetData(**options) if kind == "sync" else AsyncInternetData(**options)
         )
         self.database = DatabaseAdapter(self.client)
+        self.oauth = OauthAdapter(self.client)
 
     def close(self) -> None:
         if isinstance(self.client, InternetData):
@@ -111,6 +113,149 @@ class DatabaseAdapter:
         if isinstance(self._client, InternetData):
             return method(*args, **kwargs)
         return asyncio.run(method(*args, **kwargs))
+
+
+class OauthAdapter:
+    """The `oauth` surface of whichever client this run is exercising."""
+
+    def __init__(self, client: InternetData | AsyncInternetData) -> None:
+        self._client = client
+
+    def use_clock(self, clock: FakeClock) -> None:
+        if isinstance(self._client, InternetData):
+            self._client.oauth._clock = clock
+        else:
+            self._client.oauth._clock = AsyncFakeClock(clock)
+
+    def metadata(self, **kwargs: Any) -> Any:
+        return self._call("metadata", **kwargs)
+
+    def device_authorization(self, client_id: str, **kwargs: Any) -> Any:
+        return self._call("device_authorization", client_id, **kwargs)
+
+    def exchange_device_code(self, client_id: str, device_code: str, **kwargs: Any) -> Any:
+        return self._call("exchange_device_code", client_id, device_code, **kwargs)
+
+    def exchange_refresh_token(self, client_id: str, refresh_token: str, **kwargs: Any) -> Any:
+        return self._call("exchange_refresh_token", client_id, refresh_token, **kwargs)
+
+    def revoke(self, client_id: str, token: str, **kwargs: Any) -> Any:
+        return self._call("revoke", client_id, token, **kwargs)
+
+    def poll_device_token(self, client_id: str, device: Any, **kwargs: Any) -> Any:
+        return self._call("poll_device_token", client_id, device, **kwargs)
+
+    def _call(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        method = getattr(self._client.oauth, name)
+        if isinstance(self._client, InternetData):
+            return method(*args, **kwargs)
+        return asyncio.run(method(*args, **kwargs))
+
+
+# Past this many requests, waits or clock reads, a loop under test fails its test.
+LOOP_BOUND = 16
+
+
+class LoopBound:
+    """Ends a test whose code under test does not end.
+
+    Past its cap a stub or a fake clock calls `trip`, which BLOCKS for good rather than
+    raising: an exception can be swallowed by the very loop it is meant to stop, a wait
+    cannot. `settle` notices the trip and fails the test from outside the call.
+    """
+
+    def __init__(self) -> None:
+        self.why = ""
+        self.tripped = threading.Event()
+
+    def trip(self, why: str) -> NoReturn:
+        self.why = why
+        self.tripped.set()
+        threading.Event().wait()
+        raise AssertionError("unreachable")
+
+
+def settle(call: Callable[[], Any], bound: LoopBound | None = None, within: float = 10.0) -> Any:
+    """What `call` returned, or the exception it raised, run on a thread of its own so a
+    call that never ends fails the test instead of hanging the suite."""
+    outcome: list[Any] = []
+
+    def run() -> None:
+        try:
+            outcome.append(call())
+        except BaseException as exc:  # noqa: BLE001 - the outcome under test
+            outcome.append(exc)
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    give_up = time.monotonic() + within
+    while worker.is_alive():
+        if bound is not None and bound.tripped.is_set():
+            pytest.fail(f"{bound.why}: the call under test does not end")
+        if time.monotonic() > give_up:
+            pytest.fail(f"the call under test did not settle within {within}s")
+        worker.join(0.02)
+    return outcome[0]
+
+
+class FakeClock(Clock):
+    """A poll's sleep and monotonic clock, replaced together, recording every wait in
+    seconds. Past LOOP_BOUND waits, or twice that many clock reads, it trips `bound`."""
+
+    def __init__(self, bound: LoopBound) -> None:
+        self.waits: list[float] = []
+        self._elapsed = 0.0
+        self._reads = 0
+        self._bound = bound
+
+    def now(self) -> float:
+        self._reads += 1
+        if self._reads > 2 * LOOP_BOUND:
+            self._bound.trip(f"read the clock {self._reads} times")
+        return self._elapsed
+
+    def sleep(self, seconds: float) -> None:
+        if len(self.waits) == LOOP_BOUND:
+            self._bound.trip(f"waited more than {LOOP_BOUND} times")
+        self.waits.append(seconds)
+        self._elapsed += seconds
+
+
+class AsyncFakeClock(AsyncClock):
+    """`FakeClock`, for the async client."""
+
+    def __init__(self, clock: FakeClock) -> None:
+        self._clock = clock
+
+    def now(self) -> float:
+        return self._clock.now()
+
+    async def sleep(self, seconds: float) -> None:
+        self._clock.sleep(seconds)
+
+
+class OauthStub:
+    """Answers from a list of replies in order, repeating the last, and keeps every request
+    that left the client. Past `limit` requests it trips `bound` rather than answering."""
+
+    def __init__(
+        self, replies: list[dict[str, Any]], bound: LoopBound, limit: int = LOOP_BOUND
+    ) -> None:
+        self.requests: list[httpx.Request] = []
+        self.transport = httpx.MockTransport(self._handle)
+        self._replies = replies
+        self._bound = bound
+        self._limit = limit
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
+        if len(self.requests) == self._limit:
+            self._bound.trip(f"sent more than {self._limit} request(s)")
+        self.requests.append(request)
+        reply = self._replies[min(len(self.requests), len(self._replies)) - 1]
+        body = reply["rawBody"] if "rawBody" in reply else json.dumps(reply["body"])
+        return httpx.Response(
+            reply["status"], content=body.encode(), headers={"content-type": "application/json"}
+        )
 
 
 class Stub:
@@ -270,25 +415,6 @@ class SlowTransfer(LocalServer):
         )
         if not self.closed.wait(self._pause):
             conn.sendall(self.BODY[half:])
-
-
-def settle(call: Callable[[], Any], within: float = 10.0) -> Any:
-    """What `call` returned, or the exception it raised, run on a thread of its own so a
-    call that never ends fails the test instead of hanging the suite."""
-    outcome: list[Any] = []
-
-    def run() -> None:
-        try:
-            outcome.append(call())
-        except BaseException as exc:  # noqa: BLE001 - the outcome under test
-            outcome.append(exc)
-
-    worker = threading.Thread(target=run, daemon=True)
-    worker.start()
-    worker.join(within)
-    if worker.is_alive():
-        pytest.fail(f"the call under test did not settle within {within}s")
-    return outcome[0]
 
 
 def database(base: str, **overrides: Any) -> dict[str, Any]:

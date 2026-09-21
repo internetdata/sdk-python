@@ -22,6 +22,8 @@ from helpers import (
     LIST_PATH,
     METADATA_PATH,
     ClientFactory,
+    FakeClock,
+    LoopBound,
     SlowBody,
     Stub,
     database,
@@ -33,11 +35,14 @@ from internetdata import (
     Database,
     DatabaseMetadata,
     DatabaseVersion,
+    DeviceAuthorization,
     Download,
     InternetData,
     InternetDataError,
     MetadataColumn,
+    OauthMetadata,
     Outcome,
+    TokenResponse,
     _core,
 )
 from internetdata._generated.models.database import Database as WireDatabase
@@ -48,8 +53,13 @@ from internetdata._generated.models.database_metadata_column import (
     DatabaseMetadataColumn as WireDatabaseMetadataColumn,
 )
 from internetdata._generated.models.database_version import DatabaseVersion as WireDatabaseVersion
+from internetdata._generated.models.device_authorization import (
+    DeviceAuthorization as WireDeviceAuthorization,
+)
 from internetdata._generated.models.download import Download as WireDownload
 from internetdata._generated.models.download_outcome import DownloadOutcome as WireDownloadOutcome
+from internetdata._generated.models.oauth_metadata import OauthMetadata as WireOauthMetadata
+from internetdata._generated.models.token_response import TokenResponse as WireTokenResponse
 
 METADATA = {
     "id": "bogon_ip_v1",
@@ -113,6 +123,35 @@ JSON_CALLS: dict[str, Callable[..., Any]] = {
     "downloads": lambda client, **kw: client.database.downloads(**kw),
     "download_url": lambda client, **kw: client.database.download_url("bogon_ip_v1", "csvgz", **kw),
 }
+
+DEVICE = DeviceAuthorization(
+    device_code="mo_dc_x",
+    user_code="BCDF-GHJK",
+    verification_uri="https://app.example.test/device",
+    expires_in=900,
+    interval=5,
+)
+
+# Every `oauth` call, called with the keyword arguments given; each takes a per-call timeout.
+OAUTH_CALLS: dict[str, Callable[..., Any]] = {
+    "oauth.metadata": lambda client, **kw: client.oauth.metadata(**kw),
+    "oauth.device_authorization": lambda client, **kw: client.oauth.device_authorization(
+        "your-client-id", **kw
+    ),
+    "oauth.exchange_device_code": lambda client, **kw: client.oauth.exchange_device_code(
+        "your-client-id", "mo_dc_x", **kw
+    ),
+    "oauth.exchange_refresh_token": lambda client, **kw: client.oauth.exchange_refresh_token(
+        "your-client-id", "mo_rt_x", **kw
+    ),
+    "oauth.revoke": lambda client, **kw: client.oauth.revoke("your-client-id", "mo_rt_x", **kw),
+    "oauth.poll_device_token": lambda client, **kw: client.oauth.poll_device_token(
+        "your-client-id", DEVICE, **kw
+    ),
+}
+
+# Every call that takes a per-call timeout.
+PER_CALL: dict[str, Callable[..., Any]] = {**JSON_CALLS, **OAUTH_CALLS}
 
 # The two transfers, which must REFUSE a per-call timeout rather than ignore one.
 TRANSFERS: dict[str, Callable[..., Any]] = {
@@ -206,6 +245,9 @@ def test_a_rolling_license_carries_its_renewal_dates(make_client: ClientFactory)
         (WireDatabaseMetadata, DatabaseMetadata),
         (WireDatabaseMetadataColumn, MetadataColumn),
         (WireDownload, Download),
+        (WireOauthMetadata, OauthMetadata),
+        (WireDeviceAuthorization, DeviceAuthorization),
+        (WireTokenResponse, TokenResponse),
     ],
 )
 def test_every_field_the_pinned_spec_serves_is_on_the_model(wire: Any, ours: Any) -> None:
@@ -215,9 +257,13 @@ def test_every_field_the_pinned_spec_serves_is_on_the_model(wire: Any, ours: Any
     generated code and `raw` while the typed model never hears of it: `renews_at` and
     `notice_due_at` sat that way from the 2026-09-09 re-pin until 2.2.0. The generated
     classes come from the same pinned spec, which makes them the list to check against.
-    The generator suffixes a name that shadows a builtin with `_`.
+    The generator suffixes a name that shadows a builtin with `_`, and spells `mslm:apikey`
+    and `mslm:apikey_id` as `mslmapikey` and `mslmapikey_id`, which the model names
+    `apikey` and `apikey_id`.
     """
-    served = {f.name.rstrip("_") for f in attrs.fields(wire)} - {"additional_properties"}
+    renamed = {"mslmapikey": "apikey", "mslmapikey_id": "apikey_id"}
+    served = {renamed.get(f.name, f.name).rstrip("_") for f in attrs.fields(wire)}
+    served -= {"additional_properties"}
     modeled = {f.name for f in dataclasses.fields(ours)} - {"raw"}
     assert served - modeled == set(), f"{ours.__name__} lacks what the spec serves"
 
@@ -373,14 +419,16 @@ def test_a_timed_out_attempt_is_retried_under_a_bound_of_its_own(
     )
 
 
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", PER_CALL)
 def test_a_per_call_timeout_bounds_a_trickling_body_and_leaves_the_clients_own_alone(
     make_client: ClientFactory, call: str
 ) -> None:
+    bound = LoopBound()
     with SlowBody(trickle=TRICKLE) as server:
         client = make_client(base_url=server.url, timeout=CLIENT_TIMEOUT, retries=0)
-        overridden, first = _timed(lambda: JSON_CALLS[call](client, timeout=CALL_TIMEOUT))
-        default, second = _timed(lambda: JSON_CALLS[call](client))
+        client.oauth.use_clock(FakeClock(bound))
+        overridden, first = _timed(lambda: PER_CALL[call](client, timeout=CALL_TIMEOUT), bound)
+        default, second = _timed(lambda: PER_CALL[call](client), bound)
 
     _assert_timed_out(first)
     _assert_bounded_by(overridden, CALL_TIMEOUT)
@@ -391,18 +439,22 @@ def test_a_per_call_timeout_bounds_a_trickling_body_and_leaves_the_clients_own_a
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), "30", True])
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", PER_CALL)
 def test_a_per_call_timeout_no_attempt_can_meet_is_refused_before_any_request(
     make_client: ClientFactory, call: str, timeout: Any
 ) -> None:
     """Accepted, each of these failed the call instead, after the retries' backoff."""
     stub = Stub({})
     client = make_client(transport=stub.transport, retries=0)
+    clock = FakeClock(LoopBound())
+    client.oauth.use_clock(clock)
 
     with pytest.raises(ValueError, match="timeout"):
-        JSON_CALLS[call](client, timeout=timeout)
+        PER_CALL[call](client, timeout=timeout)
 
     assert stub.requests == []
+    # The poll waits before its first request, so a check made only there comes too late.
+    assert clock.waits == []
 
 
 @pytest.mark.parametrize("call", TRANSFERS)
@@ -494,10 +546,10 @@ def test_a_value_this_client_was_not_generated_for_stays_inside_the_error_type(
     assert "trial" in caught.value.message, "the message does not say which value it choked on"
 
 
-def _timed(call: Callable[[], Any]) -> tuple[float, Any]:
+def _timed(call: Callable[[], Any], bound: LoopBound | None = None) -> tuple[float, Any]:
     """How long `call` took to settle, and what it settled with."""
     started = time.monotonic()
-    outcome = settle(call)
+    outcome = settle(call, bound)
     return time.monotonic() - started, outcome
 
 

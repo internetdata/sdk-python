@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Narrows the pinned spec to the v2 API, for codegen only.
+"""Narrows the pinned spec to what this client generates from, for codegen only.
 
     python3 scripts/v2_subset.py spec/openapi.yaml /tmp/v2.yaml
 
@@ -10,6 +10,10 @@ contract held for a handful of named customers: a different credential (`?apikey
 rather than a bearer token), a different error vocabulary, and no `list`. Generating it
 would ship dead modules and, worse, a second credential spelling that looks usable from
 this client and is not.
+
+Everything else is kept: the v2 database, IAM and OAuth, as the VPNDetection SDK generates
+them. IAM is generated and left unwrapped; the `oauth` accessor sends its own requests
+and never calls the generated authorization endpoints.
 
 So the narrowing happens here rather than in the pinned copy. Unreferenced components go
 with the paths, or the generator emits models for v1 envelopes nothing can reach.
@@ -25,7 +29,12 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-KEEP_PATH_PREFIX = "/api/v2/"
+KEEP_PATH_PREFIXES = (
+    "/api/v2/",
+    "/api/v1/iam/",
+    "/oauth/",
+    "/.well-known/oauth-authorization-server",
+)
 # v1's `?apikey=` credential. Dropped with v1 itself: leaving it in the spec would put a
 # second, unusable auth spelling in the generated client.
 DROP_SECURITY_SCHEMES = ("ApiKeyAuth",)
@@ -40,18 +49,18 @@ def main(source: str, destination: str) -> int:
         spec: dict[str, Any] = yaml.load(handle)
 
     paths = spec.get("paths", {})
-    dropped = [path for path in paths if not path.startswith(KEEP_PATH_PREFIX)]
+    dropped = [path for path in paths if not path.startswith(KEEP_PATH_PREFIXES)]
     for path in dropped:
         del paths[path]
-    if not paths:
-        raise SystemExit(f"no {KEEP_PATH_PREFIX} paths survived, so the spec moved under us")
+    if not any(path.startswith(KEEP_PATH_PREFIXES[0]) for path in paths):
+        raise SystemExit(f"no {KEEP_PATH_PREFIXES[0]} paths survived, so the spec moved under us")
 
     components = spec.get("components", {})
     for scheme in DROP_SECURITY_SCHEMES:
         components.get("securitySchemes", {}).pop(scheme, None)
-    # The document-level default is v1's; every v2 operation names BearerAuth itself, and
-    # leaving a scheme here that no longer exists is an invalid spec.
-    spec["security"] = [{"BearerAuth": []}]
+    # Every kept operation names its own security, so a document-level default could only
+    # name the dropped v1 scheme, which would leave the spec invalid.
+    spec.pop("security", None)
 
     reachable = resolve_refs(spec, components)
     for section in REF_SECTIONS:
@@ -65,7 +74,7 @@ def main(source: str, destination: str) -> int:
 
     with open(destination, "w") as handle:
         yaml.dump(spec, handle)
-    print(f"{destination} <- {source} ({len(paths)} v2 paths, dropped {len(dropped)})")
+    print(f"{destination} <- {source} ({len(paths)} paths kept, dropped {len(dropped)})")
     return 0
 
 

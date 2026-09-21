@@ -10,6 +10,7 @@ import json
 import math
 import os
 import threading
+import time
 from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
 from types import ModuleType
@@ -19,13 +20,19 @@ import httpx
 
 from ._generated.client import AuthenticatedClient, Client
 from ._generated.types import Response
-from .errors import InternetDataError, error_from_response
+from .errors import InternetDataError, error_from_response, oauth_error_from
 from .models import Database, Download, to_database, to_download
 
 DEFAULT_BASE_URL = "https://internetdata.io"
 DEFAULT_RETRIES = 2
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_DOWNLOADS_LIMIT = 50
+
+OAUTH_METADATA_PATH = "/.well-known/oauth-authorization-server"
+OAUTH_DEVICE_AUTHORIZATION_PATH = "/oauth/device_authorization"
+OAUTH_TOKEN_PATH = "/oauth/token"
+OAUTH_REVOKE_PATH = "/oauth/revoke"
+DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 
 # One chunk of a transfer, and therefore the ceiling on what a download of any size
 # costs in memory.
@@ -305,6 +312,75 @@ async def exchange_async(
         raise _deadline_passed(bound) from None
 
 
+def oauth_request(
+    client: AuthenticatedClient,
+    method: str,
+    path: str,
+    form: dict[str, str] | None,
+    bound: float | None,
+) -> httpx.Response:
+    """One attempt at an OAuth endpoint, carrying no credential, its failure raised."""
+    http = client.get_httpx_client()
+    return oauth_checked(exchange(http, _oauth_build(http, method, path, form, bound), bound))
+
+
+async def oauth_request_async(
+    client: AuthenticatedClient,
+    method: str,
+    path: str,
+    form: dict[str, str] | None,
+    bound: float | None,
+) -> httpx.Response:
+    """`oauth_request`, awaited."""
+    http = client.get_async_httpx_client()
+    req = _oauth_build(http, method, path, form, bound)
+    return oauth_checked(await exchange_async(http, req, bound))
+
+
+def oauth_checked(res: httpx.Response) -> httpx.Response:
+    """A 2xx as it came, or the failure it describes.
+
+    Only a 4xx whose body is a JSON object with a STRING `error` is an OAuth refusal. Every
+    5xx, whatever its body says, is the server failing, and is retried wherever the
+    operation retries.
+    """
+    status = res.status_code
+    if 200 <= status < 300:
+        return res
+    body = _decode(res.content)
+    if 400 <= status < 500 and isinstance(body, dict) and isinstance(body.get("error"), str):
+        description = body.get("error_description")
+        raise oauth_error_from(
+            body["error"], description if isinstance(description, str) else None, status
+        )
+    raise error_from_response(status, res.headers, body)
+
+
+def oauth_body(res: httpx.Response) -> Any:
+    """A 2xx OAuth answer's JSON, or None when it does not parse."""
+    return _decode(res.content)
+
+
+class Clock:
+    """The device poll's wait and its deadline, replaced together in tests."""
+
+    def now(self) -> float:
+        return time.monotonic()
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(seconds)
+
+
+class AsyncClock:
+    """`Clock`, awaited."""
+
+    def now(self) -> float:
+        return time.monotonic()
+
+    async def sleep(self, seconds: float) -> None:
+        await asyncio.sleep(seconds)
+
+
 def malformed(exc: Exception) -> InternetDataError:
     return InternetDataError("server_error", f"malformed response from the API: {exc}")
 
@@ -389,6 +465,24 @@ def retry_delay(err: InternetDataError, attempt: int, retries: int) -> float | N
     return _BACKOFF_BASE * (2.0**attempt)
 
 
+# The generated client bakes the API key into every request it builds. None of the OAuth
+# endpoints reads one, and on the token endpoint an `Authorization` header reads as client
+# authentication, which these public clients do not have. So it comes off here, in the one
+# place every OAuth request is built.
+def _oauth_build(
+    http: httpx.Client | httpx.AsyncClient,
+    method: str,
+    path: str,
+    form: dict[str, str] | None,
+    bound: float | None,
+) -> httpx.Request:
+    req = http.build_request(method, path, data=form, timeout=httpx.Timeout(bound))
+    req.headers.pop("authorization", None)
+    return req
+
+
+# Reads the body on the attempt's own thread, and gives up between chunks once the caller
+# has stopped waiting, which closes the connection rather than draining a trickle.
 def _read_whole(
     http: httpx.Client, req: httpx.Request, abandoned: threading.Event
 ) -> httpx.Response:
