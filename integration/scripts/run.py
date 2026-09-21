@@ -13,8 +13,9 @@ reason instead:
 
   1. Nothing on PyPI satisfies the constraint in requirements.txt. Before the first
      release there is no artifact to test, and that is what CI observes until then.
-  2. The staging key is missing. The suite still collects, and every test skips from
-     inside it, so the reason lands in the pytest output rather than only here.
+  2. The staging key is missing. The suite still collects, and every database test skips
+     from inside it, so the reason lands in the pytest output rather than only here. The
+     OAuth checks carry no key and run regardless.
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ def main() -> int:
 
     reason = credential.skip_reason()
     if reason:
-        credential.notice(f"{reason}: the suite will collect and skip")
+        credential.notice(f"{reason}: the database tests will collect and skip")
     else:
         print(f"==> running against {credential.STAGING}")
 

@@ -17,6 +17,6 @@ def pytest_configure(config: pytest.Config) -> None:
 
     reason = skip_reason()
     if reason:
-        notice(f"{reason}: every test will skip")
+        notice(f"{reason}: every database test will skip; the keyless OAuth ones still run")
         return
     print(f"==> exercising the published package against {STAGING}")
