@@ -165,11 +165,10 @@ class DatabaseApi:
         """The published catalog as YOUR organization may see it.
 
         Every family carries a `standing`, so one you have never bought is listed as
-        `unlicensed` rather than hidden: the catalog is a shop window as much as an
-        inventory. The exception is a family commissioned for a single customer, which is
-        absent entirely for everyone else, because listing it would advertise that
-        customer. Nothing is cached and nothing is reconstructed here - what you get is
-        what the server sent for the key you are holding.
+        `unlicensed`: the catalog is a shop window as much as an inventory. Nothing is
+        cached and nothing is reconstructed here - what you get is what the server sent
+        for the key you are holding, so a listing held from one key is not an answer for
+        another.
 
         A license covers a FAMILY, while a download names a version, so the ids for the
         other calls come from each entry's `versions`.

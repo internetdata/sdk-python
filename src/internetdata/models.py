@@ -84,10 +84,7 @@ class Database:
     """One database FAMILY, with your organization's license beside it.
 
     A family your organization has never licensed is still listed, with `standing` set to
-    `unlicensed`, so you can see what else exists. A family commissioned for a single
-    customer is a different matter: it is absent from this listing entirely for everyone
-    who does not license it. Absence here means "not yours to see", never "does not
-    exist", so the catalog is not the same document for every key.
+    `unlicensed`, so you can see what else exists.
 
     A rolling license carries `renews_at`, when it next renews, and `notice_due_at`, the
     last day notice of non-renewal can be given for the term ending then. Both are None

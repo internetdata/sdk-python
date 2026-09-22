@@ -157,10 +157,9 @@ class AsyncDatabaseApi:
         """The published catalog as YOUR organization may see it.
 
         Every family carries a `standing`, so one you have never bought is listed as
-        `unlicensed` rather than hidden. The exception is a family commissioned for a
-        single customer, which is absent entirely for everyone else. Nothing is cached
-        and nothing is reconstructed here - what you get is what the server sent for the
-        key you are holding.
+        `unlicensed`. Nothing is cached and nothing is reconstructed here - what you get
+        is what the server sent for the key you are holding, so a listing held from one
+        key is not an answer for another.
 
         `timeout` bounds each attempt at this call alone, in place of the client's.
         """
