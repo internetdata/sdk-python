@@ -177,7 +177,7 @@ There are official InternetData client libraries available for many languages in
 
 InternetData: IP and network intelligence databases, published as CSV and MMDB, licensed by contract and downloadable on demand.
 
-[<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" width="96"/>](https://internetdata.io/)
+[<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" height="64"/>](https://internetdata.io/)
 
 ## License
 
