@@ -77,6 +77,8 @@ class DatabaseVersion:
     version: int
     summary: str
     formats: tuple[Format, ...]
+    # The formats an evaluation sample is published in, None when there is none.
+    sample_formats: tuple[Format, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +135,9 @@ class DatabaseMetadata:
     update_freq: str | None = None
     sample: dict[str, tuple[dict[str, Any], ...]] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
+    # Bytes per format and row count of the evaluation sample, where one is published.
+    sample_size: dict[str, int] | None = None
+    sample_entries: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +158,10 @@ class Download:
     apikey_id: str | None = None
     client_ip: str | None = None
     user_agent: str | None = None
+    # Whether this was the evaluation sample rather than the database itself. Keyword-only
+    # with a default, so a Download built by hand before 2.5.0 still builds; the parser
+    # always sets it.
+    sample: bool = field(default=False, kw_only=True)
 
 
 def to_database(body: dict[str, Any]) -> Database:
@@ -177,6 +186,7 @@ def to_version(body: dict[str, Any]) -> DatabaseVersion:
         version=body["version"],
         summary=body["summary"],
         formats=tuple(body["formats"]),
+        sample_formats=_optional_tuple(body.get("sample_formats")),
     )
 
 
@@ -192,6 +202,8 @@ def to_metadata(body: dict[str, Any]) -> DatabaseMetadata:
         update_freq=body.get("update_freq"),
         sample={fmt: tuple(rows) for fmt, rows in body.get("sample", {}).items()},
         raw=body,
+        sample_size=dict(body["sample_size"]) if body.get("sample_size") is not None else None,
+        sample_entries=body.get("sample_entries"),
     )
 
 
@@ -210,7 +222,12 @@ def to_download(body: dict[str, Any]) -> Download:
         apikey_id=body["apikey_id"],
         client_ip=body["client_ip"],
         user_agent=body["user_agent"],
+        sample=body["sample"],
     )
+
+
+def _optional_tuple(value: Any) -> tuple[Any, ...] | None:
+    return tuple(value) if value is not None else None
 
 
 def _datetime(value: Any) -> datetime.datetime | None:
@@ -242,6 +259,7 @@ class OauthMetadata:
     token_endpoint_auth_methods_supported: tuple[str, ...] | None = None
     authorization_response_iss_parameter_supported: bool | None = None
     service_documentation: str | None = None
+    client_id_metadata_document_supported: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,6 +326,7 @@ _OAUTH_METADATA: dict[str, _Member] = {
     "token_endpoint_auth_methods_supported": ("strs", False),
     "authorization_response_iss_parameter_supported": ("bool", False),
     "service_documentation": ("str", False),
+    "client_id_metadata_document_supported": ("bool", False),
 }
 
 _DEVICE_AUTHORIZATION: dict[str, _Member] = {

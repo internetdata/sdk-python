@@ -20,6 +20,7 @@ class Download:
         dataset_id (str):
         format_ (str):
         outcome (DownloadOutcome):
+        sample (bool): The evaluation sample rather than the database itself.
         bytes_ (int | None): Object size at redirect time, NOT bytes delivered: the transfer is a
             presigned redirect straight to object storage, so we never observe
             how much of it was taken.
@@ -33,6 +34,7 @@ class Download:
     dataset_id: str
     format_: str
     outcome: DownloadOutcome
+    sample: bool
     bytes_: int | None
     http_status: int | None
     apikey_id: None | str
@@ -47,6 +49,8 @@ class Download:
         format_ = self.format_
 
         outcome = self.outcome.value
+
+        sample = self.sample
 
         bytes_: int | None
         bytes_ = self.bytes_
@@ -72,6 +76,7 @@ class Download:
                 "dataset_id": dataset_id,
                 "format": format_,
                 "outcome": outcome,
+                "sample": sample,
                 "bytes": bytes_,
                 "http_status": http_status,
                 "apikey_id": apikey_id,
@@ -91,6 +96,8 @@ class Download:
         format_ = d.pop("format")
 
         outcome = DownloadOutcome(d.pop("outcome"))
+
+        sample = d.pop("sample")
 
         def _parse_bytes_(data: object) -> int | None:
             if data is None:
@@ -133,6 +140,7 @@ class Download:
             dataset_id=dataset_id,
             format_=format_,
             outcome=outcome,
+            sample=sample,
             bytes_=bytes_,
             http_status=http_status,
             apikey_id=apikey_id,

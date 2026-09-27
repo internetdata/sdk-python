@@ -7,6 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.database_format import DatabaseFormat
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="DatabaseVersion")
 
@@ -21,12 +22,14 @@ class DatabaseVersion:
         formats (list[DatabaseFormat]): The formats this version is BUILT in. Asking for another is a 400,
             not a gap - the `_provider` catalogs are keyed by provider id, so no
             MMDB exists for them.
+        sample_formats (list[DatabaseFormat] | Unset): The formats an evaluation sample is published in, if any.
     """
 
     id: str
     version: int
     summary: str
     formats: list[DatabaseFormat]
+    sample_formats: list[DatabaseFormat] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -41,6 +44,13 @@ class DatabaseVersion:
             formats_item = formats_item_data.value
             formats.append(formats_item)
 
+        sample_formats: list[str] | Unset = UNSET
+        if not isinstance(self.sample_formats, Unset):
+            sample_formats = []
+            for sample_formats_item_data in self.sample_formats:
+                sample_formats_item = sample_formats_item_data.value
+                sample_formats.append(sample_formats_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -51,6 +61,8 @@ class DatabaseVersion:
                 "formats": formats,
             }
         )
+        if sample_formats is not UNSET:
+            field_dict["sample_formats"] = sample_formats
 
         return field_dict
 
@@ -70,11 +82,21 @@ class DatabaseVersion:
 
             formats.append(formats_item)
 
+        _sample_formats = d.pop("sample_formats", UNSET)
+        sample_formats: list[DatabaseFormat] | Unset = UNSET
+        if _sample_formats is not UNSET:
+            sample_formats = []
+            for sample_formats_item_data in _sample_formats:
+                sample_formats_item = DatabaseFormat(sample_formats_item_data)
+
+                sample_formats.append(sample_formats_item)
+
         database_version = cls(
             id=id,
             version=version,
             summary=summary,
             formats=formats,
+            sample_formats=sample_formats,
         )
 
         database_version.additional_properties = d

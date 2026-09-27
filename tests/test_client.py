@@ -87,6 +87,7 @@ DOWNLOADS = {
             "apikey_id": "ak_1",
             "client_ip": "203.0.113.4",
             "user_agent": "curl/8.5.0",
+            "sample": False,
             "created": "2026-09-04T10:00:00.000Z",
         },
         {
@@ -98,6 +99,7 @@ DOWNLOADS = {
             "apikey_id": None,
             "client_ip": None,
             "user_agent": None,
+            "sample": True,
             "created": "2026-09-04T09:00:00.000Z",
         },
     ]
@@ -199,6 +201,7 @@ def test_a_refusal_is_listed_beside_a_success(make_client: ClientFactory) -> Non
     assert denied.bytes is None, "a refusal moved no bytes, which is not zero bytes"
     assert denied.http_status == 403
     assert denied.apikey_id is None and denied.client_ip is None
+    assert [a.sample for a in attempts] == [False, True]
 
 
 def test_the_downloads_limit_reaches_the_wire(make_client: ClientFactory) -> None:

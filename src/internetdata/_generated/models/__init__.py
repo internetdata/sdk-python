@@ -22,6 +22,7 @@ from .database_metadata_sample import DatabaseMetadataSample
 from .database_metadata_sample_additional_property_item import (
     DatabaseMetadataSampleAdditionalPropertyItem,
 )
+from .database_metadata_sample_size import DatabaseMetadataSampleSize
 from .database_metadata_schema import DatabaseMetadataSchema
 from .database_metadata_size import DatabaseMetadataSize
 from .database_version import DatabaseVersion
@@ -65,6 +66,7 @@ __all__ = (
     "DatabaseMetadataColumn",
     "DatabaseMetadataSample",
     "DatabaseMetadataSampleAdditionalPropertyItem",
+    "DatabaseMetadataSampleSize",
     "DatabaseMetadataSchema",
     "DatabaseMetadataSize",
     "DatabaseVersion",

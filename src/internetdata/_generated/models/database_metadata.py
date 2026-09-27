@@ -11,6 +11,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.database_metadata_sample import DatabaseMetadataSample
+    from ..models.database_metadata_sample_size import DatabaseMetadataSampleSize
     from ..models.database_metadata_schema import DatabaseMetadataSchema
     from ..models.database_metadata_size import DatabaseMetadataSize
 
@@ -30,6 +31,9 @@ class DatabaseMetadata:
         size (DatabaseMetadataSize): Bytes per format.
         update_freq (str | Unset): How often a new build is published.
         sample (DatabaseMetadataSample | Unset): A few real rows, keyed by format.
+        sample_size (DatabaseMetadataSampleSize | Unset): Bytes per format of the evaluation sample, where one is
+            published.
+        sample_entries (int | Unset): Row count in the evaluation sample.
     """
 
     id: str
@@ -39,6 +43,8 @@ class DatabaseMetadata:
     size: DatabaseMetadataSize
     update_freq: str | Unset = UNSET
     sample: DatabaseMetadataSample | Unset = UNSET
+    sample_size: DatabaseMetadataSampleSize | Unset = UNSET
+    sample_entries: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,6 +64,12 @@ class DatabaseMetadata:
         if not isinstance(self.sample, Unset):
             sample = self.sample.to_dict()
 
+        sample_size: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.sample_size, Unset):
+            sample_size = self.sample_size.to_dict()
+
+        sample_entries = self.sample_entries
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -73,12 +85,19 @@ class DatabaseMetadata:
             field_dict["update_freq"] = update_freq
         if sample is not UNSET:
             field_dict["sample"] = sample
+        if sample_size is not UNSET:
+            field_dict["sample_size"] = sample_size
+        if sample_entries is not UNSET:
+            field_dict["sample_entries"] = sample_entries
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.database_metadata_sample import DatabaseMetadataSample
+        from ..models.database_metadata_sample_size import (
+            DatabaseMetadataSampleSize,
+        )
         from ..models.database_metadata_schema import DatabaseMetadataSchema
         from ..models.database_metadata_size import DatabaseMetadataSize
 
@@ -102,6 +121,15 @@ class DatabaseMetadata:
         else:
             sample = DatabaseMetadataSample.from_dict(_sample)
 
+        _sample_size = d.pop("sample_size", UNSET)
+        sample_size: DatabaseMetadataSampleSize | Unset
+        if isinstance(_sample_size, Unset):
+            sample_size = UNSET
+        else:
+            sample_size = DatabaseMetadataSampleSize.from_dict(_sample_size)
+
+        sample_entries = d.pop("sample_entries", UNSET)
+
         database_metadata = cls(
             id=id,
             updated=updated,
@@ -110,6 +138,8 @@ class DatabaseMetadata:
             size=size,
             update_freq=update_freq,
             sample=sample,
+            sample_size=sample_size,
+            sample_entries=sample_entries,
         )
 
         database_metadata.additional_properties = d
