@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.6.0 - 2026-09-29
+
+### Features
+
+- Add the authorization code sign-in, with PKCE ([`61c8ac2`](https://github.com/internetdata/sdk-python/commit/61c8ac22fc84753b44e9accd2a4009ad26601e25))
+
 ## 2.5.0 - 2026-09-27
 
 ### Features
