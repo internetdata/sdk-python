@@ -30,16 +30,19 @@ from ._core import (
     AsyncClock,
     as_error,
     assert_whole_transfer,
+    authorization_url,
     build_async_transfer_client,
     build_client,
     check_timeout,
     checksums_of,
+    create_pkce,
     databases_of,
     downloads_of,
     oauth_body,
     oauth_request_async,
     parse_body,
     part_file,
+    pkce_challenge,
     redirect_location,
     request_async,
     retry_delay,
@@ -63,6 +66,7 @@ from .models import (
     Download,
     Format,
     OauthMetadata,
+    Pkce,
     TokenResponse,
     to_device_authorization,
     to_metadata,
@@ -99,6 +103,7 @@ class AsyncInternetData:
     ) -> None:
         timeout = check_timeout(timeout)
         self._client = build_client(api_key, base_url, timeout, transport)
+        self._base_url = base_url
         self._transfer = build_async_transfer_client(timeout, transport)
         self._retries = retries
         self._timeout = timeout
@@ -380,6 +385,54 @@ class AsyncOauthApi:
             "client_id": client_id,
         }
         return await self._exchange(form, timeout)
+
+    async def exchange_authorization_code(
+        self,
+        client_id: str,
+        code: str,
+        code_verifier: str,
+        redirect_uri: str,
+        *,
+        timeout: float | None = None,
+    ) -> TokenResponse:
+        """Trade a redirect's code for tokens, once; see `OauthApi.exchange_authorization_code`."""
+        form = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": code_verifier,
+        }
+        return await self._exchange(form, timeout)
+
+    def authorization_url(
+        self,
+        client_id: str,
+        redirect_uri: str,
+        code_challenge: str,
+        *,
+        scope: str | None = None,
+        state: str | None = None,
+        resource: str | None = None,
+    ) -> str:
+        """The authorization code flow's URL, made with no request; see
+        `OauthApi.authorization_url`.
+        """
+        return authorization_url(
+            self._owner._base_url,
+            client_id,
+            redirect_uri,
+            code_challenge,
+            {"scope": scope, "state": state, "resource": resource},
+        )
+
+    def create_pkce(self) -> Pkce:
+        """A fresh PKCE pair for one sign-in, from the system's secure random source."""
+        return create_pkce()
+
+    def pkce_challenge(self, verifier: str) -> str:
+        """The `S256` challenge for a PKCE verifier: its SHA-256, as unpadded base64url."""
+        return pkce_challenge(verifier)
 
     async def revoke(self, client_id: str, token: str, *, timeout: float | None = None) -> None:
         """End a token; revoking the refresh token signs the machine out."""

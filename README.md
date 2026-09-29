@@ -169,6 +169,26 @@ client = InternetData(tokens.apikey)
 
 A refusal raises `OauthAccessDeniedError` and a code that ran out raises `OauthExpiredTokenError`, and client IDs are issued on request from support@internetdata.io. `client.oauth.revoke("your-client-id", tokens.refresh_token)` signs the machine out.
 
+### Sign in with OAuth (authorization code)
+
+An app that can take a browser redirect signs the person in there instead, with a PKCE pair made for that one sign-in:
+
+```python
+from internetdata import InternetData
+
+signin = InternetData()
+redirect_uri = "http://127.0.0.1:8765/callback"
+pkce = signin.oauth.create_pkce()
+
+url = signin.oauth.authorization_url(
+    "your-client-id", redirect_uri, pkce.challenge, scope="apikeys.use", state="your-state"
+)
+# Open url in the browser. Its redirect to redirect_uri carries code and state.
+tokens = signin.oauth.exchange_authorization_code("your-client-id", code, pkce.verifier, redirect_uri)
+```
+
+Check that `state` came back as you sent it before you exchange `code`, which works once. The client ID can also be the https URL of a client metadata document your app serves, and such an app is never handed a key, so `tokens.apikey` stays `None`.
+
 ## Other Libraries
 
 There are official InternetData client libraries available for many languages including PHP, Python, Go, Java, Ruby, and many popular frameworks such as Django, Rails, and Laravel. See our GitHub at https://github.com/internetdata for more.
