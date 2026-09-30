@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.6.1 - 2026-09-30
+
+### Fixes
+
+- Bound the poll's wait, a long Retry-After and a timeout past 292 years ([`4475521`](https://github.com/internetdata/sdk-python/commit/4475521e926427265242b126b89f28971ad7f634))
+
 ## 2.6.0 - 2026-09-29
 
 ### Features
