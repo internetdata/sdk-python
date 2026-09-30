@@ -357,6 +357,34 @@ def test_a_rate_limit_is_retried_and_honors_retry_after(make_client: ClientFacto
     assert len(stub.requests) == 3
 
 
+@pytest.mark.parametrize(
+    "retry_after", ["2147484", "9223372036854775807", "1e400", "Fri, 31 Dec 9999 23:59:59 GMT"]
+)
+def test_a_retry_after_past_the_ceiling_waits_the_backoff_and_stays_a_throttle(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, retry_after: str
+) -> None:
+    """As given, 2147484 held the call for 24.8 days, and the rest raised a raw
+    OverflowError from the sync client's sleep."""
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    headers = {"Retry-After": retry_after}
+    stub = Stub({LIST_PATH: {"status": 429, "body": {"rc": "RATE_LIMITED"}, "headers": headers}})
+    client = make_client(transport=stub.transport, retries=1)
+
+    outcome = settle(client.database.list, within=5.0)
+
+    assert isinstance(outcome, InternetDataError), f"settled with {outcome!r}"
+    assert outcome.kind == "rate_limited"
+    assert len(stub.requests) == 2
+
+
+def test_a_retry_after_is_waited_as_given_up_to_the_ceiling() -> None:
+    def throttled(seconds: float) -> InternetDataError:
+        return InternetDataError("rate_limited", "RATE_LIMITED", 429, seconds)
+
+    assert _core.retry_delay(throttled(2147483.647), 0, 1) == 2147483.647
+    assert _core.retry_delay(throttled(2147483.648), 0, 1) == _core._BACKOFF_BASE
+
+
 def test_a_transport_failure_surfaces_as_a_network_error() -> None:
     def refuse(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("connection refused", request=request)
@@ -441,7 +469,7 @@ def test_a_per_call_timeout_bounds_a_trickling_body_and_leaves_the_clients_own_a
     _assert_bounded_by(default, CLIENT_TIMEOUT)
 
 
-@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), "30", True])
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), 1e300, "30", True])
 @pytest.mark.parametrize("call", PER_CALL)
 def test_a_per_call_timeout_no_attempt_can_meet_is_refused_before_any_request(
     make_client: ClientFactory, call: str, timeout: Any
@@ -494,7 +522,9 @@ def test_the_default_timeout_is_thirty_seconds() -> None:
 
 
 @pytest.mark.parametrize("client", [InternetData, AsyncInternetData])
-@pytest.mark.parametrize("timeout", [0, -1, 0.0, float("nan"), float("inf"), "30", True])
+@pytest.mark.parametrize(
+    "timeout", [0, -1, 0.0, float("nan"), float("inf"), 9223372037, 1e300, "30", True]
+)
 def test_a_timeout_no_attempt_can_meet_is_refused_when_the_client_is_built(
     client: type[InternetData | AsyncInternetData], timeout: Any
 ) -> None:
@@ -503,7 +533,7 @@ def test_a_timeout_no_attempt_can_meet_is_refused_when_the_client_is_built(
         client(API_KEY, timeout=timeout)
 
 
-@pytest.mark.parametrize("timeout", [None, 0.25, 1, 30])
+@pytest.mark.parametrize("timeout", [None, 0.25, 1, 30, 9223372036])
 def test_a_usable_timeout_builds_a_client(timeout: float | None) -> None:
     InternetData(API_KEY, timeout=timeout).close()
     asyncio.run(AsyncInternetData(API_KEY, timeout=timeout).aclose())

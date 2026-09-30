@@ -45,6 +45,20 @@ TRANSFER_CHUNK_BYTES = 1 << 20
 
 _BACKOFF_BASE = 1.0
 
+# The longest wait the sync client's clock can count, about 292 years: past it a lock's
+# wait, `socket.settimeout` and `time.sleep` all raise OverflowError instead.
+WAIT_CEILING = threading.TIMEOUT_MAX
+
+# The longest `Retry-After` waited as given, 2^31 - 1 ms, the bound every SDK takes. One
+# past it is still a throttle, waited out on the backoff: as given, 2147484 held a call
+# for 24.8 days, and 9223372036854775807, 1e400 or a year-9999 date raised a raw
+# OverflowError from the sync client's sleep (measured on 2.6.0, 2026-09-30).
+RETRY_AFTER_CEILING = 2147483.647
+
+# An `expires_in` past this, about 146 billion years, is a deadline nobody reaches. The
+# cap keeps the poll's deadline a float: past 1.8e308 adding it to the clock raises.
+POLL_DEADLINE_CAP = 2**62
+
 T = TypeVar("T")
 
 
@@ -124,8 +138,9 @@ def check_timeout(timeout: float | None) -> float | None:
     Refused where it is SET, because nothing downstream refuses it: zero, a negative
     number, NaN or a string reached the first call and failed it, and every call after,
     as a retried `network` error after three seconds of backoff, or for a string as a
-    `server_error` blaming the API. Infinity is refused too, since the sync client's wait
-    cannot hold it (`OverflowError`); None is the spelling for no bound.
+    `server_error` blaming the API. So is anything past `WAIT_CEILING`, infinity
+    included, since the sync client's wait cannot hold it: 1e300 failed every call with
+    a raw `OverflowError` (2.6.0, measured 2026-09-30). None is the spelling for no bound.
     """
     if timeout is None:
         return None
@@ -134,10 +149,11 @@ def check_timeout(timeout: float | None) -> float | None:
         or not isinstance(timeout, int | float)
         or not math.isfinite(timeout)
         or timeout <= 0
+        or timeout > WAIT_CEILING
     ):
         raise ValueError(
-            f"timeout must be a number of seconds greater than 0, or None for no bound, "
-            f"not {timeout!r}"
+            f"timeout must be a number of seconds greater than 0 and at most "
+            f"{WAIT_CEILING:.0f}, or None for no bound, not {timeout!r}"
         )
     return timeout
 
@@ -425,7 +441,11 @@ class Clock:
         return time.monotonic()
 
     def sleep(self, seconds: float) -> None:
-        time.sleep(seconds)
+        # In parts, since `time.sleep` raises past WAIT_CEILING rather than waiting.
+        while seconds > 0:
+            part = min(seconds, WAIT_CEILING)
+            time.sleep(part)
+            seconds -= part
 
 
 class AsyncClock:
@@ -513,11 +533,12 @@ def retry_delay(err: InternetDataError, attempt: int, retries: int) -> float | N
 
     A server-supplied `Retry-After` wins over the backoff schedule outright: it is the
     only thing that makes a 429 worth retrying at all, so second-guessing it with a
-    shorter wait would just spend the next attempt on the same rejection.
+    shorter wait would just spend the next attempt on the same rejection. One past
+    `RETRY_AFTER_CEILING` is waited out on the backoff instead.
     """
     if attempt >= retries or not err.retryable:
         return None
-    if err.retry_after_seconds is not None:
+    if err.retry_after_seconds is not None and err.retry_after_seconds <= RETRY_AFTER_CEILING:
         return err.retry_after_seconds
     return _BACKOFF_BASE * (2.0**attempt)
 
