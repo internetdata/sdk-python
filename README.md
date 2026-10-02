@@ -195,7 +195,7 @@ There are official InternetData client libraries available for many languages in
 
 ## About InternetData
 
-InternetData: IP and network intelligence databases, published as CSV and MMDB, licensed by contract and downloadable on demand.
+Geolocation, anonymity, ownership and network databases for IP addresses and AS numbers, licensed as files you download and query yourself.
 
 [<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" height="64"/>](https://internetdata.io/)
 
