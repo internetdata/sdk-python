@@ -86,7 +86,9 @@ class Database:
     """One database FAMILY, with your organization's license beside it.
 
     A family your organization has never licensed is still listed, with `standing` set to
-    `unlicensed`, so you can see what else exists.
+    `unlicensed`, so you can see what else exists. One that is `open` downloads with no
+    license at all, under CC BY-SA 4.0, whatever its `standing`, which still reports your
+    own license.
 
     A rolling license carries `renews_at`, when it next renews, and `notice_due_at`, the
     last day notice of non-renewal can be given for the term ending then. Both are None
@@ -107,6 +109,9 @@ class Database:
     notice_due_at: datetime.datetime | None = field(default=None, kw_only=True)
     versions: tuple[DatabaseVersion, ...]
     raw: dict[str, Any] = field(default_factory=dict)
+    # Keyword-only with a default, so a Database built by hand before 2.7.0 still builds;
+    # the parser always sets it.
+    open: bool = field(default=False, kw_only=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +167,10 @@ class Download:
     # with a default, so a Download built by hand before 2.5.0 still builds; the parser
     # always sets it.
     sample: bool = field(default=False, kw_only=True)
+    # Taken under the Open license rather than one of your licenses: an Open database
+    # downloaded while your organization held no license in term for it. Keyword-only
+    # with a default, so a Download built by hand before 2.7.0 still builds.
+    open: bool = field(default=False, kw_only=True)
 
 
 def to_database(body: dict[str, Any]) -> Database:
@@ -177,6 +186,7 @@ def to_database(body: dict[str, Any]) -> Database:
         notice_due_at=_datetime(body["notice_due_at"]),
         versions=tuple(to_version(v) for v in body["versions"]),
         raw=body,
+        open=body["open"],
     )
 
 
@@ -223,6 +233,7 @@ def to_download(body: dict[str, Any]) -> Download:
         client_ip=body["client_ip"],
         user_agent=body["user_agent"],
         sample=body["sample"],
+        open=body["open"],
     )
 
 

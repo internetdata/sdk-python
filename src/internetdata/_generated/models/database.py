@@ -31,7 +31,13 @@ class Database:
             summary (str): One line on what the newest version contains.
             standing (Standing): Where your license for a database family stands today. `licensed` is a
                 live grant, `expired` one whose term has ended, and `unlicensed` a
-                database published but never bought.
+                database published but never bought. An Open database (`open`)
+                downloads whatever this says.
+            open_ (bool): An Open database: any organization downloads it, and fetches its
+                checksums, with no license, under CC BY-SA 4.0 (credit
+                InternetData, https://internetdata.io, and share what you build
+                from it under the same license). `standing` still reports your
+                own license, which grants more where you hold one.
             license_type (DatabaseLicenseTypeType1 | DatabaseLicenseTypeType2Type1 | DatabaseLicenseTypeType3Type1 | None):
                 What your license permits you to do with the data. Null when there
                 is no license, which is every family with standing `unlicensed`.
@@ -51,6 +57,7 @@ class Database:
     name: str
     summary: str
     standing: Standing
+    open_: bool
     license_type: (
         DatabaseLicenseTypeType1
         | DatabaseLicenseTypeType2Type1
@@ -72,6 +79,8 @@ class Database:
         summary = self.summary
 
         standing = self.standing.value
+
+        open_ = self.open_
 
         license_type: None | str
         if (
@@ -120,6 +129,7 @@ class Database:
                 "name": name,
                 "summary": summary,
                 "standing": standing,
+                "open": open_,
                 "license_type": license_type,
                 "starts": starts,
                 "expires": expires,
@@ -143,6 +153,8 @@ class Database:
         summary = d.pop("summary")
 
         standing = Standing(d.pop("standing"))
+
+        open_ = d.pop("open")
 
         def _parse_license_type(
             data: object,
@@ -260,6 +272,7 @@ class Database:
             name=name,
             summary=summary,
             standing=standing,
+            open_=open_,
             license_type=license_type,
             starts=starts,
             expires=expires,

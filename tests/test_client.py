@@ -88,6 +88,7 @@ DOWNLOADS = {
             "client_ip": "203.0.113.4",
             "user_agent": "curl/8.5.0",
             "sample": False,
+            "open": True,
             "created": "2026-09-04T10:00:00.000Z",
         },
         {
@@ -100,6 +101,7 @@ DOWNLOADS = {
             "client_ip": None,
             "user_agent": None,
             "sample": True,
+            "open": False,
             "created": "2026-09-04T09:00:00.000Z",
         },
     ]
@@ -202,6 +204,7 @@ def test_a_refusal_is_listed_beside_a_success(make_client: ClientFactory) -> Non
     assert denied.http_status == 403
     assert denied.apikey_id is None and denied.client_ip is None
     assert [a.sample for a in attempts] == [False, True]
+    assert [a.open for a in attempts] == [True, False]
 
 
 def test_the_downloads_limit_reaches_the_wire(make_client: ClientFactory) -> None:
@@ -223,6 +226,19 @@ def test_a_licence_with_no_end_date_reads_as_none(make_client: ClientFactory) ->
     assert family.expires is None
     assert family.renews_at is None
     assert family.notice_due_at is None
+
+
+def test_an_open_family_is_read_beside_its_standing(make_client: ClientFactory) -> None:
+    served = [
+        database("asn", standing="unlicensed", open=True, license_type=None, starts=None),
+        database("vpn_ip"),
+    ]
+    stub = Stub({LIST_PATH: {"body": {"databases": served}}})
+    client = make_client(transport=stub.transport)
+
+    families = client.database.list()
+
+    assert [(f.open, f.standing) for f in families] == [(True, "unlicensed"), (False, "licensed")]
 
 
 def test_a_rolling_license_carries_its_renewal_dates(make_client: ClientFactory) -> None:

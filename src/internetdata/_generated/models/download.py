@@ -21,6 +21,9 @@ class Download:
         format_ (str):
         outcome (DownloadOutcome):
         sample (bool): The evaluation sample rather than the database itself.
+        open_ (bool): Taken under the Open license rather than one of your licenses: an
+            Open database downloaded while your organization held no license
+            in term for it.
         bytes_ (int | None): Object size at redirect time, NOT bytes delivered: the transfer is a
             presigned redirect straight to object storage, so we never observe
             how much of it was taken.
@@ -35,6 +38,7 @@ class Download:
     format_: str
     outcome: DownloadOutcome
     sample: bool
+    open_: bool
     bytes_: int | None
     http_status: int | None
     apikey_id: None | str
@@ -51,6 +55,8 @@ class Download:
         outcome = self.outcome.value
 
         sample = self.sample
+
+        open_ = self.open_
 
         bytes_: int | None
         bytes_ = self.bytes_
@@ -77,6 +83,7 @@ class Download:
                 "format": format_,
                 "outcome": outcome,
                 "sample": sample,
+                "open": open_,
                 "bytes": bytes_,
                 "http_status": http_status,
                 "apikey_id": apikey_id,
@@ -98,6 +105,8 @@ class Download:
         outcome = DownloadOutcome(d.pop("outcome"))
 
         sample = d.pop("sample")
+
+        open_ = d.pop("open")
 
         def _parse_bytes_(data: object) -> int | None:
             if data is None:
@@ -141,6 +150,7 @@ class Download:
             format_=format_,
             outcome=outcome,
             sample=sample,
+            open_=open_,
             bytes_=bytes_,
             http_status=http_status,
             apikey_id=apikey_id,

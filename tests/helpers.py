@@ -441,6 +441,7 @@ def database(base: str, **overrides: Any) -> dict[str, Any]:
         "name": base.replace("_", " ").title(),
         "summary": f"{base} rows",
         "standing": "licensed",
+        "open": False,
         "license_type": "standard",
         "starts": "2026-01-01T00:00:00.000Z",
         "expires": None,
