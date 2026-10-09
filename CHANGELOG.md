@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.0 - 2026-10-09
+
+### Features
+
+- Re-pin the spec to 2026.10.08, adding the Open databases' open flag ([`3df886d`](https://github.com/internetdata/sdk-python/commit/3df886df5444af30fb0299ccbd3d83ebaea61b6b))
+
 ## 2.6.2 - 2026-10-04
 
 ### Fixes
