@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.1 - 2026-10-10
+
+### Fixes
+
+- Re-pin the spec to 2026.10.09: rotating a key needs apikeys.reveal ([`b4fe760`](https://github.com/internetdata/sdk-python/commit/b4fe7609aae6f68ab1e3fc15f25cdd507ccfc410))
+
 ## 2.7.0 - 2026-10-09
 
 ### Features
