@@ -2,6 +2,14 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.2 - 2026-10-12
+
+### Fixes
+
+- Read Retry-After as whole seconds or an HTTP date, nothing else ([`60fb07c`](https://github.com/internetdata/sdk-python/commit/60fb07ce9bc3606d59c15a73a3da8dc2516313a6))
+- Trim the API key, and refuse one holding a control character ([`ef12b72`](https://github.com/internetdata/sdk-python/commit/ef12b72bf154034ebb78d52fca105f42cdfdcc83))
+- Fail an answer missing what it must hold, and classify a 4xx by status ([`0a6c327`](https://github.com/internetdata/sdk-python/commit/0a6c3275277a0391e63af6ac3d05f95ff58b8d2d))
+
 ## 2.7.1 - 2026-10-10
 
 ### Fixes
