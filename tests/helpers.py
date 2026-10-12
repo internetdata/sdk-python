@@ -301,6 +301,11 @@ class Stub:
         route = self.routes.get(request.url.path)
         if route is None:
             return httpx.Response(404, json={"rc": "UNKNOWN_DATASET"})
+        if "raw" in route:
+            # Bytes as they are, for a body that is not JSON at all.
+            return httpx.Response(
+                route.get("status", 200), content=route["raw"], headers=route.get("headers")
+            )
         return httpx.Response(
             route.get("status", 200), json=self._body(route), headers=route.get("headers")
         )

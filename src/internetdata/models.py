@@ -175,36 +175,36 @@ class Download:
 
 def to_database(body: dict[str, Any]) -> Database:
     return Database(
-        base=body["base"],
-        name=body["name"],
-        summary=body["summary"],
-        standing=body["standing"],
+        base=_present(body, "base"),
+        name=_present(body, "name"),
+        summary=_present(body, "summary"),
+        standing=_present(body, "standing"),
         license_type=body["license_type"],
         starts=_datetime(body["starts"]),
         expires=_datetime(body["expires"]),
         renews_at=_datetime(body["renews_at"]),
         notice_due_at=_datetime(body["notice_due_at"]),
-        versions=tuple(to_version(v) for v in body["versions"]),
+        versions=tuple(to_version(v) for v in _present(body, "versions")),
         raw=body,
-        open=body["open"],
+        open=_present(body, "open"),
     )
 
 
 def to_version(body: dict[str, Any]) -> DatabaseVersion:
     return DatabaseVersion(
-        id=body["id"],
-        version=body["version"],
-        summary=body["summary"],
-        formats=tuple(body["formats"]),
+        id=_present(body, "id"),
+        version=_present(body, "version"),
+        summary=_present(body, "summary"),
+        formats=tuple(_present(body, "formats")),
         sample_formats=_optional_tuple(body.get("sample_formats")),
     )
 
 
 def to_metadata(body: dict[str, Any]) -> DatabaseMetadata:
     return DatabaseMetadata(
-        id=body["id"],
+        id=_present(body, "id"),
         updated=datetime.date.fromisoformat(body["updated"]),
-        entries=body["entries"],
+        entries=_present(body, "entries"),
         schema={
             fmt: tuple(to_column(c) for c in columns) for fmt, columns in body["schema"].items()
         },
@@ -218,23 +218,40 @@ def to_metadata(body: dict[str, Any]) -> DatabaseMetadata:
 
 
 def to_column(body: dict[str, Any]) -> MetadataColumn:
-    return MetadataColumn(name=body["name"], type=body["type"], description=body.get("description"))
+    return MetadataColumn(
+        name=_present(body, "name"),
+        type=_present(body, "type"),
+        description=body.get("description"),
+    )
 
 
 def to_download(body: dict[str, Any]) -> Download:
     return Download(
-        dataset_id=body["dataset_id"],
-        format=body["format"],
-        outcome=body["outcome"],
+        dataset_id=_present(body, "dataset_id"),
+        format=_present(body, "format"),
+        outcome=_present(body, "outcome"),
         created=datetime.datetime.fromisoformat(body["created"]),
         bytes=body["bytes"],
         http_status=body["http_status"],
         apikey_id=body["apikey_id"],
         client_ip=body["client_ip"],
         user_agent=body["user_agent"],
-        sample=body["sample"],
-        open=body["open"],
+        sample=_present(body, "sample"),
+        open=_present(body, "open"),
     )
+
+
+def _present(body: dict[str, Any], name: str) -> Any:
+    """A member the spec requires and never sends as null.
+
+    A null one is the server's failure, raised for the caller to report as one, rather
+    than handed back in the answer: 2.7.1 listed a family whose `base` was null as a
+    family with no base (measured 2026-10-12).
+    """
+    value = body[name]
+    if value is None:
+        raise ValueError(f"{name} is null")
+    return value
 
 
 def _optional_tuple(value: Any) -> tuple[Any, ...] | None:

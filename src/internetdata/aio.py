@@ -48,7 +48,6 @@ from ._core import (
     request_async,
     retry_delay,
     storage_refusal,
-    unwrap,
 )
 from ._generated.api.database_v_2 import (
     database_checksum_v2,
@@ -172,7 +171,7 @@ class AsyncDatabaseApi:
 
         async def call() -> builtins.list[Database]:
             res = await request_async(list_databases, self._client, self._bound(timeout))
-            return parse_body(unwrap(res), databases_of)
+            return parse_body(res, databases_of)
 
         return await self._retrying(call)
 
@@ -186,7 +185,7 @@ class AsyncDatabaseApi:
             res = await request_async(
                 database_metadata_v2, self._client, self._bound(timeout), id=database_id
             )
-            return parse_body(unwrap(res), to_metadata)
+            return parse_body(res, to_metadata)
 
         return await self._retrying(call)
 
@@ -206,7 +205,7 @@ class AsyncDatabaseApi:
                 id=database_id,
                 format_=DatabaseFormat(format),
             )
-            return parse_body(unwrap(res), checksums_of)
+            return parse_body(res, checksums_of)
 
         return await self._retrying(call)
 
@@ -222,7 +221,7 @@ class AsyncDatabaseApi:
             res = await request_async(
                 list_downloads, self._client, self._bound(timeout), limit=limit
             )
-            return parse_body(unwrap(res), downloads_of)
+            return parse_body(res, downloads_of)
 
         return await self._retrying(call)
 

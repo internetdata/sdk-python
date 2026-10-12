@@ -14,7 +14,7 @@ import os
 import secrets
 import threading
 import time
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import IO, Any, TypeVar, cast
@@ -23,7 +23,6 @@ from urllib.parse import quote
 import httpx
 
 from ._generated.client import AuthenticatedClient, Client
-from ._generated.types import Response
 from .errors import InternetDataError, error_from_response, oauth_error_from
 from .models import Database, Download, Pkce, to_database, to_download
 
@@ -238,67 +237,51 @@ def part_file(destination: str | os.PathLike[str]) -> Iterator[IO[bytes]]:
         raise
 
 
-def send(call: Callable[[], Response[Any]]) -> Response[Any]:
-    """One generated endpoint call.
-
-    The generated code eagerly decodes the body of every DOCUMENTED status into its model
-    before anything here sees the response, and it raises three different ways doing it: a
-    503 carrying an intermediary's HTML error page is a `ValueError` out of `json()`, a
-    200 missing a required key is a `KeyError`, and a `standing` this pinned spec predates
-    is a `ValueError` out of an enum constructor. All three are the server sending
-    something this client cannot read, which is a failed request rather than a bug in the
-    caller's code, so all three become the one error type here.
-
-    The call does nothing but build one generated request, send it and hand the answer to
-    the generated decoder, which is what keeps this catch from swallowing a fault of our own.
-    An argument is converted before it, so a format this client does not publish is the
-    caller's `ValueError` rather than the server's failure.
-    """
-    try:
-        return call()
-    except (KeyError, TypeError, ValueError) as exc:
-        raise malformed(exc) from exc
-
-
-async def send_async(call: Callable[[], Awaitable[Response[Any]]]) -> Response[Any]:
-    """`send`, awaited."""
-    try:
-        return await call()
-    except (KeyError, TypeError, ValueError) as exc:
-        raise malformed(exc) from exc
-
-
 def request(
     endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
-) -> Response[Any]:
-    """`send` for one generated endpoint, one attempt of it finished within `bound` seconds,
-    or unbounded when that is None.
+) -> httpx.Response:
+    """One attempt at one generated endpoint, finished within `bound` seconds, or unbounded
+    when that is None, and its answer checked by `decoded`.
 
     Assembled from the endpoint module's `_get_kwargs` and `_build_response` because its
     `sync_detailed` sends through httpx alone, and httpx has no bound on the attempt.
     """
-
-    def call() -> Response[Any]:
-        http = client.get_httpx_client()
-        req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
-        res = exchange(http, req, bound)
-        return cast(Response[Any], endpoint._build_response(client=client, response=res))
-
-    return send(call)
+    http = client.get_httpx_client()
+    req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
+    return decoded(endpoint, client, exchange(http, req, bound))
 
 
 async def request_async(
     endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
-) -> Response[Any]:
+) -> httpx.Response:
     """`request`, awaited."""
+    http = client.get_async_httpx_client()
+    req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
+    return decoded(endpoint, client, await exchange_async(http, req, bound))
 
-    async def call() -> Response[Any]:
-        http = client.get_async_httpx_client()
-        req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
-        res = await exchange_async(http, req, bound)
-        return cast(Response[Any], endpoint._build_response(client=client, response=res))
 
-    return await send_async(call)
+def decoded(
+    endpoint: ModuleType, client: AuthenticatedClient, res: httpx.Response
+) -> httpx.Response:
+    """`res`, once the generated decoder has read it, where it is a 2xx.
+
+    The generated code eagerly decodes the body of every DOCUMENTED status into its model,
+    and it raises three different ways doing it: a body that is not JSON is a `ValueError`
+    out of `json()`, an object missing a required key a `KeyError`, and a `standing` this
+    pinned spec predates a `ValueError` out of an enum constructor. On a 2xx each is the
+    server sending an answer this client cannot read, so each is the one error type here,
+    a retried `server_error` carrying the status.
+
+    Any other status is left to `unwrap`, which classifies it by the status alone, whatever
+    its body. Decoded too, a proxy's HTML page on a 401, a 404 or an empty 403 was a
+    retried `server_error` with no status, sent three times (2.7.1, measured 2026-10-12).
+    """
+    if 200 <= res.status_code < 300:
+        try:
+            endpoint._build_response(client=client, response=res)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise malformed(exc, res.status_code) from exc
+    return res
 
 
 def exchange(http: httpx.Client, req: httpx.Request, bound: float | None) -> httpx.Response:
@@ -478,16 +461,16 @@ class AsyncClock:
         await asyncio.sleep(seconds)
 
 
-def malformed(exc: Exception) -> InternetDataError:
-    return InternetDataError("server_error", f"malformed response from the API: {exc}")
+def malformed(exc: Exception, status: int) -> InternetDataError:
+    return InternetDataError("server_error", f"malformed response from the API: {exc}", status)
 
 
-def unwrap(res: Response[Any]) -> dict[str, Any]:
+def unwrap(res: httpx.Response) -> dict[str, Any]:
     """The response body as it came off the wire, or the failure it describes."""
     body = _decode(res.content)
-    status = int(res.status_code)
+    status = res.status_code
     if not 200 <= status < 300:
-        raise error_from_response(status, _headers(res), body)
+        raise error_from_response(status, res.headers, body)
     if not isinstance(body, dict):
         raise InternetDataError("server_error", "the API answered with a non-object body", status)
     return body
@@ -504,23 +487,27 @@ def as_error(exc: InternetDataError | httpx.HTTPError) -> InternetDataError:
     return InternetDataError("network", str(exc) or type(exc).__name__)
 
 
-def parse_body(body: dict[str, Any], parse: Callable[[dict[str, Any]], T]) -> T:
+def parse_body(res: httpx.Response, parse: Callable[[dict[str, Any]], T]) -> T:
     """A served body through the model layer, with a malformed one reported as the
-    server's failure rather than as a traceback out of a dataclass constructor."""
+    server's failure, carrying its status, rather than as a traceback out of a dataclass
+    constructor."""
+    body = unwrap(res)
     try:
         return parse(body)
-    except (KeyError, TypeError, ValueError) as exc:
-        raise malformed(exc) from exc
+    # AttributeError too: metadata's `schema` or `sample` as an array instead of an object
+    # escaped 2.7.1 raw, out of `.items()` (measured 2026-10-12).
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise malformed(exc, res.status_code) from exc
 
 
-def redirect_location(res: Response[Any]) -> str:
+def redirect_location(res: httpx.Response) -> str:
     """Where a `302` points, or whatever the API said instead."""
-    location: str | None = _headers(res).get("location")
-    if int(res.status_code) == 302 and location:
+    location: str | None = res.headers.get("location")
+    if res.status_code == 302 and location:
         return location
     unwrap(res)
     raise InternetDataError(
-        "server_error", "expected a redirect to object storage", int(res.status_code)
+        "server_error", "expected a redirect to object storage", res.status_code
     )
 
 
@@ -539,13 +526,18 @@ def downloads_of(body: dict[str, Any]) -> list[Download]:
 
 
 def checksums_of(body: dict[str, Any]) -> dict[str, str]:
-    """The digests, unwrapped one level past the envelope.
+    """The digests, unwrapped one level past the envelope, the four the spec requires
+    among them as strings.
 
     The response carries `id` and `format` beside them, so reading a top-level `sha256`
     finds nothing. That exact mistake shipped in another binding's 1.0.x, which is why
     the shared corpus pins the depth.
     """
-    return dict(body["checksums"])
+    digests = dict(body["checksums"])
+    for algorithm in ("md5", "sha1", "sha256", "sha512"):
+        if not isinstance(digests[algorithm], str):
+            raise TypeError(f"the {algorithm} checksum is not a string: {digests[algorithm]!r}")
+    return digests
 
 
 def retry_delay(err: InternetDataError, attempt: int, retries: int) -> float | None:
@@ -614,13 +606,6 @@ class _Abandonable(httpx.SyncByteStream):
 
 def _deadline_passed(bound: float) -> InternetDataError:
     return InternetDataError("network", f"the request did not complete within {bound:g} seconds")
-
-
-# The generated Response declares a plain MutableMapping, but always carries httpx's
-# case-insensitive Headers. Rebuilding one keeps a header lookup case-blind whichever it
-# turns out to be, which matters for `Retry-After`.
-def _headers(res: Response[Any]) -> httpx.Headers:
-    return httpx.Headers(res.headers)
 
 
 def _decode(content: bytes) -> Any:

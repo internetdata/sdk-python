@@ -9,7 +9,7 @@ import inspect
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, cast, get_args
 
 import attrs
 import httpx
@@ -18,6 +18,7 @@ from helpers import (
     API,
     API_KEY,
     CHECKSUM_PATH,
+    DOWNLOAD_PATH,
     DOWNLOADS_PATH,
     LIST_PATH,
     METADATA_PATH,
@@ -318,6 +319,157 @@ def test_a_malformed_body_is_the_servers_failure_not_a_traceback(
 
     assert caught.value.kind == "server_error"
     assert "malformed response" in caught.value.message
+
+
+JSON_CALL_PATHS = {
+    "list": LIST_PATH,
+    "metadata": METADATA_PATH,
+    "checksums": CHECKSUM_PATH,
+    "downloads": DOWNLOADS_PATH,
+    "download_url": DOWNLOAD_PATH,
+}
+
+UNREADABLE_2XX = {
+    "html": b"<html><body>Bad gateway</body></html>",
+    "cut off": b'{"databases": [',
+    "empty": b"",
+    "null": b"null",
+    "array": b"[]",
+    "empty object": b"{}",
+}
+
+
+@pytest.mark.parametrize("body", UNREADABLE_2XX)
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_a_2xx_the_call_cannot_read_is_a_retried_server_error_with_its_status(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, call: str, body: str
+) -> None:
+    """Retried, but with no status, through 2.7.1. For `download_url` a 200 stands for the
+    302 it did not send."""
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    stub = Stub({JSON_CALL_PATHS[call]: {"raw": UNREADABLE_2XX[body]}})
+    client = make_client(transport=stub.transport, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        JSON_CALLS[call](client)
+
+    assert caught.value.kind == "server_error"
+    assert caught.value.status == 200
+    assert len(stub.requests) == 3
+
+
+def _without(member: str, entry: dict[str, Any]) -> dict[str, Any]:
+    return {**entry, member: None}
+
+
+def _version_without(member: str) -> dict[str, Any]:
+    family = database("bogon_ip")
+    return {**family, "versions": [_without(member, family["versions"][0])]}
+
+
+DIGESTS = {"md5": "m", "sha1": "s1", "sha256": "s256", "sha512": "s512"}
+
+# Each member the spec requires and never sends as null, sent as null; and metadata's two
+# maps sent as arrays, which escaped 2.7.1 as a raw AttributeError.
+UNREADABLE_MEMBERS: dict[str, tuple[str, dict[str, Any]]] = {
+    **{
+        f"list {m}": (LIST_PATH, {"databases": [_without(m, database("bogon_ip"))]})
+        for m in ("base", "name", "summary", "standing", "open", "versions")
+    },
+    **{
+        f"list version {m}": (LIST_PATH, {"databases": [_version_without(m)]})
+        for m in ("id", "version", "summary", "formats")
+    },
+    **{
+        f"metadata {m}": (METADATA_PATH, _without(m, METADATA))
+        for m in ("id", "updated", "entries", "schema", "size")
+    },
+    "metadata column name": (
+        METADATA_PATH,
+        {**METADATA, "schema": {"csvgz": [{"name": None, "type": "string"}]}},
+    ),
+    "metadata schema array": (METADATA_PATH, {**METADATA, "schema": []}),
+    "metadata sample array": (METADATA_PATH, {**METADATA, "sample": []}),
+    **{
+        f"downloads {m}": (
+            DOWNLOADS_PATH,
+            {"downloads": [_without(m, cast(list[dict[str, Any]], DOWNLOADS["downloads"])[0])]},
+        )
+        for m in ("dataset_id", "format", "outcome", "sample", "open", "created")
+    },
+    **{
+        f"checksums {m}": (
+            CHECKSUM_PATH,
+            {"id": "bogon_ip_v1", "format": "csvgz", "checksums": _without(m, DIGESTS)},
+        )
+        for m in ("md5", "sha256")
+    },
+    "checksums number": (
+        CHECKSUM_PATH,
+        {"id": "bogon_ip_v1", "format": "csvgz", "checksums": {**DIGESTS, "sha1": 5}},
+    ),
+}
+
+MEMBER_CALLS = {LIST_PATH: "list", METADATA_PATH: "metadata", DOWNLOADS_PATH: "downloads"}
+
+
+@pytest.mark.parametrize("case", UNREADABLE_MEMBERS)
+def test_an_answer_missing_what_the_spec_requires_is_a_retried_server_error(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    """2.7.1 handed a null required member back in the answer, and raised a raw
+    AttributeError for metadata's `schema` or `sample` sent as an array."""
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    path, body = UNREADABLE_MEMBERS[case]
+    stub = Stub({path: {"body": body}})
+    client = make_client(transport=stub.transport, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        JSON_CALLS[MEMBER_CALLS.get(path, "checksums")](client)
+
+    assert (caught.value.kind, caught.value.status) == ("server_error", 200)
+    assert len(stub.requests) == 3
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "kind"),
+    [
+        (401, b"<html>401</html>", "unauthorized"),
+        (401, b"{}", "unauthorized"),
+        (403, b"", "forbidden"),
+        (404, b"<html>Not Found</html>", "bad_request"),
+        (400, b"null", "bad_request"),
+    ],
+)
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_a_4xx_is_classified_by_its_status_whatever_its_body(
+    make_client: ClientFactory, call: str, status: int, body: bytes, kind: str
+) -> None:
+    """A proxy's page on a 4xx is still the client's error, sent once. Read through the
+    generated decoder, it was a retried server error with no status (2.7.1)."""
+    stub = Stub({JSON_CALL_PATHS[call]: {"status": status, "raw": body}})
+    client = make_client(transport=stub.transport, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        JSON_CALLS[call](client)
+
+    assert (caught.value.kind, caught.value.status) == (kind, status)
+    assert len(stub.requests) == 1
+
+
+@pytest.mark.parametrize("call", JSON_CALLS)
+def test_a_5xx_page_is_a_retried_server_error_with_its_status(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, call: str
+) -> None:
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    stub = Stub({JSON_CALL_PATHS[call]: {"status": 503, "raw": b"<html>503</html>"}})
+    client = make_client(transport=stub.transport, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        JSON_CALLS[call](client)
+
+    assert (caught.value.kind, caught.value.status) == ("server_error", 503)
+    assert len(stub.requests) == 3
 
 
 def test_a_server_error_is_retried_and_then_reported(make_client: ClientFactory) -> None:

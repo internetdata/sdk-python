@@ -43,7 +43,6 @@ from ._core import (
     request,
     retry_delay,
     storage_refusal,
-    unwrap,
 )
 from ._generated.api.database_v_2 import (
     database_checksum_v2,
@@ -184,7 +183,7 @@ class DatabaseApi:
 
         def call() -> builtins.list[Database]:
             res = request(list_databases, self._client, self._bound(timeout))
-            return parse_body(unwrap(res), databases_of)
+            return parse_body(res, databases_of)
 
         return self._retrying(call)
 
@@ -199,7 +198,7 @@ class DatabaseApi:
 
         def call() -> DatabaseMetadata:
             res = request(database_metadata_v2, self._client, self._bound(timeout), id=database_id)
-            return parse_body(unwrap(res), to_metadata)
+            return parse_body(res, to_metadata)
 
         return self._retrying(call)
 
@@ -222,7 +221,7 @@ class DatabaseApi:
                 id=database_id,
                 format_=DatabaseFormat(format),
             )
-            return parse_body(unwrap(res), checksums_of)
+            return parse_body(res, checksums_of)
 
         return self._retrying(call)
 
@@ -239,7 +238,7 @@ class DatabaseApi:
 
         def call() -> builtins.list[Download]:
             res = request(list_downloads, self._client, self._bound(timeout), limit=limit)
-            return parse_body(unwrap(res), downloads_of)
+            return parse_body(res, downloads_of)
 
         return self._retrying(call)
 
