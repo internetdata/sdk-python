@@ -245,7 +245,7 @@ def test_the_api_key_reaches_the_wire_under_the_bearer_scheme(
     assert stub.requests[0].headers.get("authorization") == f"Bearer {API_KEY}"
 
 
-@pytest.mark.parametrize("api_key", [None, ""])
+@pytest.mark.parametrize("api_key", [None, "", "   ", "\t", "\r\n"])
 def test_a_keyless_client_sends_no_authorization_header(
     make_client: ClientFactory, api_key: str | None
 ) -> None:
@@ -260,3 +260,26 @@ def test_a_keyless_client_sends_no_authorization_header(
     client.database.list()
 
     assert "authorization" not in stub.requests[0].headers
+
+
+def test_the_api_key_is_trimmed(make_client: ClientFactory) -> None:
+    """A key pasted with a line ending around it went out padded, which httpx refuses, so
+    every call failed as a retried network error with nothing sent (2.7.1)."""
+    stub = Stub({LIST_PATH: {"body": {"databases": []}}})
+    client = make_client(transport=stub.transport, api_key=f" {API_KEY}\r\n")
+
+    client.database.list()
+
+    assert stub.requests[0].headers.get("authorization") == f"Bearer {API_KEY}"
+
+
+@pytest.mark.parametrize(
+    "api_key", ["key\r\nX-Injected: 1", "ke\ty", "key\x00", "key\x7f", "k\ney"]
+)
+def test_a_control_character_in_the_api_key_is_refused_where_it_is_set(
+    make_client: ClientFactory, api_key: str
+) -> None:
+    """Accepted, a CR, LF or NUL failed every call as a retried network error with nothing
+    sent, and a tab or DEL went out on the wire inside the header (2.7.1)."""
+    with pytest.raises(ValueError, match="control character"):
+        make_client(api_key=api_key)

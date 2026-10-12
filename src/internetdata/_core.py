@@ -81,10 +81,11 @@ def build_client(
     `set_httpx_client()`, which silently bypasses auth: the generated client only adds
     the `Authorization` header when it CONSTRUCTS the httpx client itself.
     """
+    api_key = check_api_key(api_key)
     httpx_args: dict[str, Any] = {}
     if transport is not None:
         httpx_args["transport"] = transport
-    if not api_key:
+    if api_key is None:
         return cast(
             AuthenticatedClient,
             Client(base_url=base_url, timeout=httpx.Timeout(timeout), httpx_args=httpx_args),
@@ -130,6 +131,25 @@ def build_async_transfer_client(
         transport=transport,
         follow_redirects=True,
     )
+
+
+def check_api_key(api_key: str | None) -> str | None:
+    """`api_key` without the blanks around it, or None when nothing else is left.
+
+    Refused where it is SET when a control character remains: httpx refuses a header
+    holding a CR, LF or NUL, so every call failed as a retried `network` error with nothing
+    sent, while a tab or DEL inside the key went out on the wire. Untrimmed, a key of blanks
+    was sent as one rather than as no key, and failed every call the same way (2.7.1,
+    measured 2026-10-12).
+    """
+    if api_key is None:
+        return None
+    if not isinstance(api_key, str):
+        raise TypeError(f"api_key must be a string or None, not {type(api_key).__name__}")
+    key = api_key.strip()
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in key):
+        raise ValueError("api_key holds a control character")
+    return key or None
 
 
 def check_timeout(timeout: float | None) -> float | None:
