@@ -60,6 +60,7 @@ from internetdata._generated.models.download import Download as WireDownload
 from internetdata._generated.models.download_outcome import DownloadOutcome as WireDownloadOutcome
 from internetdata._generated.models.oauth_metadata import OauthMetadata as WireOauthMetadata
 from internetdata._generated.models.token_response import TokenResponse as WireTokenResponse
+from internetdata.errors import error_from_response
 
 METADATA = {
     "id": "bogon_ip_v1",
@@ -374,7 +375,7 @@ def test_a_rate_limit_is_retried_and_honors_retry_after(make_client: ClientFacto
 
 
 @pytest.mark.parametrize(
-    "retry_after", ["2147484", "9223372036854775807", "1e400", "Fri, 31 Dec 9999 23:59:59 GMT"]
+    "retry_after", ["2147484", "9223372036854775807", "9" * 400, "Fri, 31 Dec 9999 23:59:59 GMT"]
 )
 def test_a_retry_after_past_the_ceiling_waits_the_backoff_and_stays_a_throttle(
     make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, retry_after: str
@@ -391,6 +392,69 @@ def test_a_retry_after_past_the_ceiling_waits_the_backoff_and_stays_a_throttle(
     assert isinstance(outcome, InternetDataError), f"settled with {outcome!r}"
     assert outcome.kind == "rate_limited"
     assert len(stub.requests) == 2
+
+
+@pytest.mark.parametrize(
+    "retry_after",
+    [
+        "-1",
+        "x",
+        "tomorrow",
+        "+1",
+        "0x10",
+        "1_0",
+        "1e3",
+        "1.5",
+        "inf",
+        "1e400",
+        "2026-10-12T06:00:00Z",
+        "Mon, 12 Oct 2026 06:00:00 +0500",
+        "Mon, 12 Oct 2026 06:00:00 PST",
+        "12 Oct 2026 06:00:00 GMT",
+        "Mon, 12 Oct 26 06:00:00 GMT",
+        "Tue, 31 Nov 2026 10:00:00 GMT",
+        "Mon, 12 Oct 2026 25:61:61 GMT",
+    ],
+)
+def test_a_retry_after_that_is_neither_seconds_nor_an_http_date_is_a_spent_quota(
+    make_client: ClientFactory, retry_after: str
+) -> None:
+    """`float()` and `email.utils` read `+1` as a second, `1_0` as ten, `1e3` as a thousand
+    and a date in any zone (2.7.1). RFC 9110 admits digits, or a date in one of three
+    forms, in GMT."""
+    headers = {"Retry-After": retry_after}
+    stub = Stub({LIST_PATH: {"status": 429, "body": {"rc": "LIMITED"}, "headers": headers}})
+    # No retries, so a value misread as a long wait fails here rather than holding the run.
+    client = make_client(transport=stub.transport, retries=0)
+
+    with pytest.raises(InternetDataError) as caught:
+        client.database.list()
+
+    assert caught.value.kind == "quota_exceeded"
+    assert caught.value.retry_after_seconds is None
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        lambda when: when.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        lambda when: when.strftime("%A, %d-%b-%y %H:%M:%S GMT"),
+        lambda when: when.strftime("%a %b ") + f"{when.day:2d}" + when.strftime(" %H:%M:%S %Y"),
+    ],
+    ids=["imf-fixdate", "rfc850", "asctime"],
+)
+def test_a_retry_after_date_is_read_in_each_of_rfc_9110s_three_forms(
+    form: Callable[[datetime.datetime], str],
+) -> None:
+    # Computed as the case runs: a date made up front can have passed by the time it is read.
+    when = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=100)
+    headers = httpx.Headers({"Retry-After": form(when)})
+
+    err = error_from_response(429, headers, None)
+
+    assert err.kind == "rate_limited"
+    assert err.retry_after_seconds is not None
+    assert 98 <= err.retry_after_seconds <= 101
 
 
 def test_a_retry_after_is_waited_as_given_up_to_the_ceiling() -> None:
