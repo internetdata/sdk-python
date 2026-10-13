@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.3 - 2026-10-13
+
+### Fixes
+
+- Re-pin the spec to 2026.10.13: Open databases come with a license ([`56c0eb8`](https://github.com/internetdata/sdk-python/commit/56c0eb82adcaa594c1cb48e4aa326842cbf4489c))
+
 ## 2.7.2 - 2026-10-12
 
 ### Fixes
