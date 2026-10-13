@@ -59,7 +59,6 @@ def sync_detailed(
      The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-    An `open` database downloads whatever its `standing`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -87,7 +86,6 @@ def sync(
      The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-    An `open` database downloads whatever its `standing`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -111,7 +109,6 @@ async def asyncio_detailed(
      The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-    An `open` database downloads whatever its `standing`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -137,7 +134,6 @@ async def asyncio(
      The whole published catalog, with your organization's license beside
     each entry, so `standing` says whether a database is yours today
     (`licensed`), was (`expired`), or has never been bought (`unlicensed`).
-    An `open` database downloads whatever its `standing`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

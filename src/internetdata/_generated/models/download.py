@@ -21,9 +21,7 @@ class Download:
         format_ (str):
         outcome (DownloadOutcome):
         sample (bool): The evaluation sample rather than the database itself.
-        open_ (bool): Taken under the Open license rather than one of your licenses: an
-            Open database downloaded while your organization held no license
-            in term for it.
+        open_ (bool): A download of an Open database.
         bytes_ (int | None): Object size at redirect time, NOT bytes delivered: the transfer is a
             presigned redirect straight to object storage, so we never observe
             how much of it was taken.

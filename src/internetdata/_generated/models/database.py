@@ -31,13 +31,12 @@ class Database:
             summary (str): One line on what the newest version contains.
             standing (Standing): Where your license for a database family stands today. `licensed` is a
                 live grant, `expired` one whose term has ended, and `unlicensed` a
-                database published but never bought. An Open database (`open`)
-                downloads whatever this says.
-            open_ (bool): An Open database: any organization downloads it, and fetches its
-                checksums, with no license, under CC BY-SA 4.0 (credit
-                InternetData, https://internetdata.io, and share what you build
-                from it under the same license). `standing` still reports your
-                own license, which grants more where you hold one.
+                database published but never bought.
+            open_ (bool): An Open database: free under CC BY-SA 4.0 (credit InternetData,
+                https://internetdata.io, and share what you build from it under
+                the same license). Every organization holds a `standard` license
+                to it from the start, which `standing` and `license_type` report
+                like any other.
             license_type (DatabaseLicenseTypeType1 | DatabaseLicenseTypeType2Type1 | DatabaseLicenseTypeType3Type1 | None):
                 What your license permits you to do with the data. Null when there
                 is no license, which is every family with standing `unlicensed`.
