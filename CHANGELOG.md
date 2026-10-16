@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.5 - 2026-10-16
+
+### Fixes
+
+- Retry a database answer whose member has the wrong type ([`b800390`](https://github.com/internetdata/sdk-python/commit/b800390f6f5d2c4ebaa4c518fa47e132093a15d9))
+
 ## 2.7.4 - 2026-10-16
 
 ### Fixes
