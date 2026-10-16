@@ -2,6 +2,13 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.7.4 - 2026-10-16
+
+### Fixes
+
+- Re-pin the spec to 2026.10.15: three descriptions in US spelling ([`a91d87c`](https://github.com/internetdata/sdk-python/commit/a91d87c2032980cb1900b3d91782963656d0a960))
+- Drop every trailing slash from the base URL, and refuse a key outside ASCII ([`8c75289`](https://github.com/internetdata/sdk-python/commit/8c75289e48cb40e05d63ffb21a9866ed7dbc7b9f))
+
 ## 2.7.3 - 2026-10-13
 
 ### Fixes

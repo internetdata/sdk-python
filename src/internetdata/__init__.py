@@ -39,7 +39,7 @@ from .models import (
     TokenResponse,
 )
 
-__version__ = "2.7.3"
+__version__ = "2.7.4"
 
 __all__ = [
     "DATABASE_FORMATS",
