@@ -174,83 +174,107 @@ class Download:
 
 def to_database(body: dict[str, Any]) -> Database:
     return Database(
-        base=_present(body, "base"),
-        name=_present(body, "name"),
-        summary=_present(body, "summary"),
-        standing=_present(body, "standing"),
-        license_type=body["license_type"],
+        base=_present(body, "base", str),
+        name=_present(body, "name", str),
+        summary=_present(body, "summary", str),
+        standing=_present(body, "standing", str),
+        license_type=_nullable(body, "license_type", str),
         starts=_datetime(body["starts"]),
         expires=_datetime(body["expires"]),
         renews_at=_datetime(body["renews_at"]),
         notice_due_at=_datetime(body["notice_due_at"]),
-        versions=tuple(to_version(v) for v in _present(body, "versions")),
+        versions=tuple(to_version(v) for v in _present(body, "versions", list)),
         raw=body,
-        open=_present(body, "open"),
+        open=_present(body, "open", bool),
     )
 
 
 def to_version(body: dict[str, Any]) -> DatabaseVersion:
     return DatabaseVersion(
-        id=_present(body, "id"),
-        version=_present(body, "version"),
-        summary=_present(body, "summary"),
-        formats=tuple(_present(body, "formats")),
+        id=_present(body, "id", str),
+        version=_present(body, "version", int),
+        summary=_present(body, "summary", str),
+        formats=_strings(_present(body, "formats", list), "formats"),
         sample_formats=_optional_tuple(body.get("sample_formats")),
     )
 
 
 def to_metadata(body: dict[str, Any]) -> DatabaseMetadata:
     return DatabaseMetadata(
-        id=_present(body, "id"),
+        id=_present(body, "id", str),
         updated=datetime.date.fromisoformat(body["updated"]),
-        entries=_present(body, "entries"),
+        entries=_present(body, "entries", int),
         schema={
             fmt: tuple(to_column(c) for c in columns) for fmt, columns in body["schema"].items()
         },
-        size=dict(body["size"]),
+        size=_sizes(_present(body, "size", dict), "size"),
         update_freq=body.get("update_freq"),
         sample={fmt: tuple(rows) for fmt, rows in body.get("sample", {}).items()},
         raw=body,
-        sample_size=dict(body["sample_size"]) if body.get("sample_size") is not None else None,
-        sample_entries=body.get("sample_entries"),
+        sample_size=_sizes(body["sample_size"], "sample_size")
+        if body.get("sample_size") is not None
+        else None,
+        sample_entries=_nullable(body, "sample_entries", int, absent=True),
     )
 
 
 def to_column(body: dict[str, Any]) -> MetadataColumn:
     return MetadataColumn(
-        name=_present(body, "name"),
-        type=_present(body, "type"),
+        name=_present(body, "name", str),
+        type=_present(body, "type", str),
         description=body.get("description"),
     )
 
 
 def to_download(body: dict[str, Any]) -> Download:
     return Download(
-        dataset_id=_present(body, "dataset_id"),
-        format=_present(body, "format"),
-        outcome=_present(body, "outcome"),
+        dataset_id=_present(body, "dataset_id", str),
+        format=_present(body, "format", str),
+        outcome=_present(body, "outcome", str),
         created=datetime.datetime.fromisoformat(body["created"]),
-        bytes=body["bytes"],
-        http_status=body["http_status"],
+        bytes=_nullable(body, "bytes", int),
+        http_status=_nullable(body, "http_status", int),
         apikey_id=body["apikey_id"],
         client_ip=body["client_ip"],
         user_agent=body["user_agent"],
-        sample=_present(body, "sample"),
-        open=_present(body, "open"),
+        sample=_present(body, "sample", bool),
+        open=_present(body, "open", bool),
     )
 
 
-def _present(body: dict[str, Any], name: str) -> Any:
-    """A member the spec requires and never sends as null.
+def _present(body: dict[str, Any], name: str, kind: type) -> Any:
+    """A member the spec requires and never sends as null, of the type it gives.
 
     A null one is the server's failure, raised for the caller to report as one, rather
     than handed back in the answer: 2.7.1 listed a family whose `base` was null as a
-    family with no base (measured 2026-10-12).
+    family with no base (measured 2026-10-12). So is one of another type: 2.7.4 handed
+    back a version served as `"3"` as that string (measured 2026-10-16).
     """
     value = body[name]
     if value is None:
         raise ValueError(f"{name} is null")
+    return _of_type(value, name, kind)
+
+
+def _nullable(body: dict[str, Any], name: str, kind: type, absent: bool = False) -> Any:
+    """A member that may be null, or with `absent` left out, and is otherwise of `kind`."""
+    value = body.get(name) if absent else body[name]
+    return None if value is None else _of_type(value, name, kind)
+
+
+def _of_type(value: Any, name: str, kind: type) -> Any:
+    # A bool is an int to isinstance, and neither may stand for the other.
+    if isinstance(value, bool) != (kind is bool) or not isinstance(value, kind):
+        raise ValueError(f"{name} is not a {kind.__name__}: {value!r}")
     return value
+
+
+def _strings(values: list[Any], name: str) -> tuple[Any, ...]:
+    return tuple(_of_type(v, name, str) for v in values)
+
+
+def _sizes(sizes: Any, name: str) -> dict[str, int]:
+    return {fmt: _of_type(n, name, int) for fmt, n in _of_type(sizes, name, dict).items()}
 
 
 def _optional_tuple(value: Any) -> tuple[Any, ...] | None:

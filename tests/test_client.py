@@ -410,6 +410,50 @@ UNREADABLE_MEMBERS: dict[str, tuple[str, dict[str, Any]]] = {
     ),
 }
 
+
+def _with(member: str, value: Any, entry: dict[str, Any]) -> dict[str, Any]:
+    return {**entry, member: value}
+
+
+def _version_with(member: str, value: Any) -> dict[str, Any]:
+    family = database("bogon_ip")
+    return {**family, "versions": [_with(member, value, family["versions"][0])]}
+
+
+_DOWNLOAD = cast(list[dict[str, Any]], DOWNLOADS["downloads"])[0]
+
+# A member of another type than the spec gives it, which 2.7.4 handed back in the answer:
+# a version served as "3" came back as that string (measured 2026-10-16).
+UNREADABLE_MEMBERS.update(
+    {
+        "list version as a numeric string": (
+            LIST_PATH,
+            {"databases": [_version_with("version", "3")]},
+        ),
+        "list version as true": (LIST_PATH, {"databases": [_version_with("version", True)]}),
+        "list format as a number": (LIST_PATH, {"databases": [_version_with("formats", [1])]}),
+        "list base as a number": (
+            LIST_PATH,
+            {"databases": [_with("base", 7, database("bogon_ip"))]},
+        ),
+        "list open as a string": (
+            LIST_PATH,
+            {"databases": [_with("open", "false", database("bogon_ip"))]},
+        ),
+        "list license_type as a number": (
+            LIST_PATH,
+            {"databases": [_with("license_type", 1, database("bogon_ip"))]},
+        ),
+        "metadata entries as a string": (METADATA_PATH, _with("entries", "42", METADATA)),
+        "metadata size as a string": (METADATA_PATH, _with("size", {"csvgz": "760"}, METADATA)),
+        "downloads bytes as a string": (
+            DOWNLOADS_PATH,
+            {"downloads": [_with("bytes", "760", _DOWNLOAD)]},
+        ),
+        "downloads sample as 1": (DOWNLOADS_PATH, {"downloads": [_with("sample", 1, _DOWNLOAD)]}),
+    }
+)
+
 MEMBER_CALLS = {LIST_PATH: "list", METADATA_PATH: "metadata", DOWNLOADS_PATH: "downloads"}
 
 
