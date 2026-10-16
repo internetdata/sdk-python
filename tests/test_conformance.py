@@ -274,12 +274,44 @@ def test_the_api_key_is_trimmed(make_client: ClientFactory) -> None:
 
 
 @pytest.mark.parametrize(
-    "api_key", ["key\r\nX-Injected: 1", "ke\ty", "key\x00", "key\x7f", "k\ney"]
+    "api_key", ["key\r\nX-Injected: 1", "ke\ty", "key\x00", "key\x7f", "k\ney", "k\x85ey", "kéy"]
 )
-def test_a_control_character_in_the_api_key_is_refused_where_it_is_set(
+def test_a_control_character_or_one_outside_ascii_is_refused_where_the_key_is_set(
     make_client: ClientFactory, api_key: str
 ) -> None:
     """Accepted, a CR, LF or NUL failed every call as a retried network error with nothing
-    sent, and a tab or DEL went out on the wire inside the header (2.7.1)."""
-    with pytest.raises(ValueError, match="control character"):
+    sent, and a tab or DEL went out on the wire inside the header (2.7.1). A C1 control or
+    any other character outside ASCII failed every call with a raw UnicodeEncodeError and
+    nothing sent, since httpx encodes a header value as ASCII (2.7.3)."""
+    with pytest.raises(ValueError, match="control character or one outside ASCII"):
         make_client(api_key=api_key)
+
+
+@pytest.mark.parametrize("slashes", [1, 2, 3])
+def test_every_trailing_slash_on_the_base_url_is_dropped(
+    make_client: ClientFactory, slashes: int
+) -> None:
+    """httpx drops one when it joins a path on and keeps the rest, so through 2.7.3 a
+    second reached the API as `//api/v2/database/list`, which prod answers with a
+    redirect this client does not follow."""
+    digests = {"md5": "m", "sha1": "s1", "sha256": "s256", "sha512": "s512"}
+    stub = Stub(
+        {
+            LIST_PATH: {"body": {"databases": []}},
+            CHECKSUM_PATH: {"body": {"id": "bogon_ip_v1", "format": "csvgz", "checksums": digests}},
+            "/.well-known/oauth-authorization-server": {
+                "body": {
+                    "issuer": "https://api.example",
+                    "authorization_endpoint": "https://api.example/oauth/authorize",
+                    "token_endpoint": "https://api.example/oauth/token",
+                }
+            },
+        }
+    )
+    client = make_client(transport=stub.transport, base_url="https://api.example" + "/" * slashes)
+
+    client.database.list()
+    client.database.checksums("bogon_ip_v1", "csvgz")
+    client.oauth.metadata()
+
+    assert stub.paths() == [LIST_PATH, CHECKSUM_PATH, "/.well-known/oauth-authorization-server"]

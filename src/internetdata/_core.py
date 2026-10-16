@@ -81,6 +81,11 @@ def build_client(
     the `Authorization` header when it CONSTRUCTS the httpx client itself.
     """
     api_key = check_api_key(api_key)
+    # httpx drops one trailing slash when it joins a path onto the base URL and keeps the
+    # rest, so a second or third reached the API as `//api/v2/database/list`, which prod
+    # answers with a redirect this client does not follow: every call failed (2.7.3,
+    # measured 2026-10-16).
+    base_url = base_url.rstrip("/")
     httpx_args: dict[str, Any] = {}
     if transport is not None:
         httpx_args["transport"] = transport
@@ -135,19 +140,20 @@ def build_async_transfer_client(
 def check_api_key(api_key: str | None) -> str | None:
     """`api_key` without the blanks around it, or None when nothing else is left.
 
-    Refused where it is SET when a control character remains: httpx refuses a header
-    holding a CR, LF or NUL, so every call failed as a retried `network` error with nothing
-    sent, while a tab or DEL inside the key went out on the wire. Untrimmed, a key of blanks
-    was sent as one rather than as no key, and failed every call the same way (2.7.1,
-    measured 2026-10-12).
+    Refused where it is SET when a control character remains, or a character outside
+    ASCII, which httpx cannot put in a header: a CR, LF or NUL failed every call as a
+    retried `network` error with nothing sent, a C1 control or any other non-ASCII
+    character as a raw `UnicodeEncodeError` (2.7.3, measured 2026-10-16), while a tab or
+    DEL went out on the wire. Untrimmed, a key of blanks was sent as one rather than as no
+    key, and failed every call the same way (2.7.1, measured 2026-10-12).
     """
     if api_key is None:
         return None
     if not isinstance(api_key, str):
         raise TypeError(f"api_key must be a string or None, not {type(api_key).__name__}")
     key = api_key.strip()
-    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in key):
-        raise ValueError("api_key holds a control character")
+    if any(ord(char) < 0x20 or ord(char) >= 0x7F for char in key):
+        raise ValueError("api_key holds a control character or one outside ASCII")
     return key or None
 
 
