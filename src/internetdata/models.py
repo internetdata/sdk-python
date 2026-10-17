@@ -311,6 +311,7 @@ class OauthMetadata:
     authorization_response_iss_parameter_supported: bool | None = None
     service_documentation: str | None = None
     client_id_metadata_document_supported: bool | None = None
+    registration_endpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -389,6 +390,7 @@ _OAUTH_METADATA: dict[str, _Member] = {
     "authorization_response_iss_parameter_supported": ("bool", False),
     "service_documentation": ("str", False),
     "client_id_metadata_document_supported": ("bool", False),
+    "registration_endpoint": ("str", False),
 }
 
 _DEVICE_AUTHORIZATION: dict[str, _Member] = {

@@ -10,6 +10,8 @@ from .account_revealed_apikey import AccountRevealedApikey
 from .account_user import AccountUser
 from .apikey_detail import ApikeyDetail
 from .apikey_list import ApikeyList
+from .client_registration import ClientRegistration
+from .client_registration_request import ClientRegistrationRequest
 from .database import Database
 from .database_checksum_v2_response_200 import DatabaseChecksumV2Response200
 from .database_format import DatabaseFormat
@@ -56,6 +58,8 @@ __all__ = (
     "AccountUser",
     "ApikeyDetail",
     "ApikeyList",
+    "ClientRegistration",
+    "ClientRegistrationRequest",
     "Database",
     "DatabaseChecksumV2Response200",
     "DatabaseFormat",
