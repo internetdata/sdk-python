@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.8.0 - 2026-10-17
+
+### Features
+
+- Re-pin the spec to 2026.10.16: dynamic client registration ([`f5844ce`](https://github.com/internetdata/sdk-python/commit/f5844cef95abc21e261c42695512a9ae3e57f001))
+
 ## 2.7.5 - 2026-10-16
 
 ### Fixes
