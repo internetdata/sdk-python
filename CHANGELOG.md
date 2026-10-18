@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.0 - 2026-10-18
+
+### Features
+
+- Add oauth.register, for RFC 7591 dynamic client registration ([`5b107e1`](https://github.com/internetdata/sdk-python/commit/5b107e12907ec5cb58eaeb7ff4e0d48a023330ca))
+
 ## 2.8.0 - 2026-10-17
 
 ### Features
