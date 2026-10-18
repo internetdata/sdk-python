@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.1 - 2026-10-18
+
+### Fixes
+
+- Re-pin the spec to 2026.10.18: client_id_issued_at is int64 ([`8469fd7`](https://github.com/internetdata/sdk-python/commit/8469fd70636255c8d2f24f9984ee7854d600d968))
+
 ## 2.9.0 - 2026-10-18
 
 ### Features
