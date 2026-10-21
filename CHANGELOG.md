@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.2 - 2026-10-21
+
+### Fixes
+
+- Re-pin the spec to 2026.10.21: a 403 for a refused address ([`0a1c67f`](https://github.com/internetdata/sdk-python/commit/0a1c67f54654cf3353d60a4e651c19790ffa48b1))
+
 ## 2.9.1 - 2026-10-18
 
 ### Fixes
