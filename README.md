@@ -146,7 +146,7 @@ From 2.3.0, `list`, `metadata`, `checksums`, `downloads` and `download_url` each
 
 **Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
 
-Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit is the API facing a traffic burst, and retrying later works; a spent quota needs your allowance raised or the window to roll over. The library retries rate limits for you, and server and network failures, but never a spent quota or anything else you sent.
+`rate_limited` is a 429 that carries `Retry-After`, and the library retries it for you, as it does server and network failures. `quota_exceeded` is a 429 without one, which it never retries, and it retries nothing else you sent either. InternetData's database API has no quota, so you won't see `quota_exceeded` from it.
 
 ### Sign in with OAuth (device flow)
 
