@@ -574,12 +574,22 @@ def databases_of(body: dict[str, Any]) -> list[Database]:
     Nothing is added here, and nothing may be: a family built for a single customer is
     absent from this array for every organization that does not license it, so filling a
     gap from any other source would publish the fact that the family exists.
+
+    An object where the list is due is refused rather than read as one with nothing in it:
+    `{"databases": {}}` answered an empty catalog (2.9.2, measured 2026-10-25).
     """
-    return [to_database(d) for d in body["databases"]]
+    return [to_database(d) for d in _listed(body, "databases")]
 
 
 def downloads_of(body: dict[str, Any]) -> list[Download]:
-    return [to_download(d) for d in body["downloads"]]
+    return [to_download(d) for d in _listed(body, "downloads")]
+
+
+def _listed(body: dict[str, Any], name: str) -> list[Any]:
+    value = body[name]
+    if not isinstance(value, list):
+        raise TypeError(f"{name} is not a list: {value!r}")
+    return value
 
 
 def checksums_of(body: dict[str, Any]) -> dict[str, str]:
@@ -589,7 +599,16 @@ def checksums_of(body: dict[str, Any]) -> dict[str, str]:
     The response carries `id` and `format` beside them, so reading a top-level `sha256`
     finds nothing. That exact mistake shipped in another binding's 1.0.x, which is why
     the shared corpus pins the depth.
+
+    `id` and `format` are read too, though nothing returns them: a null or numeric `id`
+    came back as a whole answer, and so did `checksums` sent as a list of pairs (2.9.2,
+    measured 2026-10-25).
     """
+    for member in ("id", "format"):
+        if not isinstance(body[member], str):
+            raise TypeError(f"the checksum answer's {member} is not a string: {body[member]!r}")
+    if not isinstance(body["checksums"], dict):
+        raise TypeError(f"checksums is not an object: {body['checksums']!r}")
     digests = dict(body["checksums"])
     for algorithm in ("md5", "sha1", "sha256", "sha512"):
         if not isinstance(digests[algorithm], str):

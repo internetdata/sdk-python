@@ -454,6 +454,86 @@ UNREADABLE_MEMBERS.update(
     }
 )
 
+_CHECKSUM = {"id": "bogon_ip_v1", "format": "csvgz", "checksums": DIGESTS}
+
+# Each of these came back from 2.9.2 as an answer (measured 2026-10-25): an object where a
+# list is due as an empty one, a member typed nowhere but the spec as served, a
+# `license_type` outside its three, and a checksum answer's unread `id` whatever it held.
+UNREADABLE_MEMBERS.update(
+    {
+        "list databases as an object": (LIST_PATH, {"databases": {}}),
+        "downloads as an object": (DOWNLOADS_PATH, {"downloads": {}}),
+        "list license_type outside its enum": (
+            LIST_PATH,
+            {"databases": [_with("license_type", "trial", database("bogon_ip"))]},
+        ),
+        "list sample_formats as an object": (
+            LIST_PATH,
+            {"databases": [_version_with("sample_formats", {})]},
+        ),
+        "metadata update_freq as a number": (METADATA_PATH, _with("update_freq", 1, METADATA)),
+        "metadata column description as a number": (
+            METADATA_PATH,
+            {**METADATA, "schema": {"csvgz": [{"name": "ip", "type": "string", "description": 1}]}},
+        ),
+        "metadata columns as an object": (METADATA_PATH, {**METADATA, "schema": {"csvgz": {}}}),
+        "metadata sample rows as an object": (METADATA_PATH, {**METADATA, "sample": {"csvgz": {}}}),
+        "metadata sample row as pairs": (
+            METADATA_PATH,
+            {**METADATA, "sample": {"csvgz": [[["first_ip", "10.0.0.0"]]]}},
+        ),
+        **{
+            f"downloads {m} as a number": (DOWNLOADS_PATH, {"downloads": [_with(m, 7, _DOWNLOAD)]})
+            for m in ("apikey_id", "client_ip", "user_agent")
+        },
+        "checksums id as null": (CHECKSUM_PATH, _with("id", None, _CHECKSUM)),
+        "checksums id as a number": (CHECKSUM_PATH, _with("id", 7, _CHECKSUM)),
+        "checksums as pairs": (CHECKSUM_PATH, _with("checksums", list(DIGESTS.items()), _CHECKSUM)),
+    }
+)
+
+# What `fromisoformat` read as a date-time and RFC 3339 does not (2.9.2, measured
+# 2026-10-25): no offset, which made a naive datetime, a date alone, a space for the `T`,
+# offsets without their colon, with seconds or past 23:59, no seconds, a comma for the
+# point, the basic format and a week date. Then what neither reads.
+NOT_DATE_TIMES = [
+    "2026-10-05T10:00:00",
+    "2026-10-05",
+    "2026-10-05 10:00:00Z",
+    "2026-10-05T10:00:00+0500",
+    "2026-10-05T10:00:00+05",
+    "2026-10-05T10:00:00+05:00:30",
+    "2026-10-05T10:00:00+05:60",
+    "2026-10-05T10:00:00+24:00",
+    "2026-10-05T10:00Z",
+    "2026-10-05T10:00:00,5Z",
+    "20261005T100000Z",
+    "2026-W41-1T10:00:00Z",
+    "2026-10-5T10:00:00Z",
+    " 2026-10-05T10:00:00Z",
+    "2026-02-30T10:00:00Z",
+    "2026-10-05T23:59:60Z",
+    "tomorrow",
+]
+
+# The same for `updated`, a `date`: the basic format and week dates were read.
+NOT_DATES = ["20261005", "2026-W41-1", "2026-W41", "2026-10-5", "2026-02-30", "2026-10-05T00:00Z"]
+
+for _value in NOT_DATE_TIMES:
+    UNREADABLE_MEMBERS[f"list starts {_value!r}"] = (
+        LIST_PATH,
+        {"databases": [database("bogon_ip", starts=_value)]},
+    )
+    UNREADABLE_MEMBERS[f"downloads created {_value!r}"] = (
+        DOWNLOADS_PATH,
+        {"downloads": [_with("created", _value, _DOWNLOAD)]},
+    )
+for _value in NOT_DATES:
+    UNREADABLE_MEMBERS[f"metadata updated {_value!r}"] = (
+        METADATA_PATH,
+        _with("updated", _value, METADATA),
+    )
+
 MEMBER_CALLS = {LIST_PATH: "list", METADATA_PATH: "metadata", DOWNLOADS_PATH: "downloads"}
 
 
@@ -473,6 +553,32 @@ def test_an_answer_missing_what_the_spec_requires_is_a_retried_server_error(
 
     assert (caught.value.kind, caught.value.status) == ("server_error", 200)
     assert len(stub.requests) == 3
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-10-05T10:00:00Z",
+        "2026-10-05t10:00:00z",
+        "2026-10-05T10:00:00-00:00",
+        "2026-10-05T15:30:00+05:30",
+        "2026-10-05T05:00:00.123456789-05:00",
+    ],
+)
+def test_an_rfc_3339_date_time_is_read_as_the_instant_it_names(
+    make_client: ClientFactory, value: str
+) -> None:
+    """In each of RFC 3339's spellings, the lowercase ones `fromisoformat` refused included;
+    past six digits a fraction is cut."""
+    stub = Stub({LIST_PATH: {"body": {"databases": [database("bogon_ip", starts=value)]}}})
+    client = make_client(transport=stub.transport)
+
+    starts = client.database.list()[0].starts
+
+    assert starts is not None and starts.utcoffset() is not None
+    expected = datetime.datetime(2026, 10, 5, 10, tzinfo=datetime.UTC)
+    assert starts.replace(microsecond=0) == expected
+    assert starts.microsecond == (123456 if "." in value else 0)
 
 
 @pytest.mark.parametrize(

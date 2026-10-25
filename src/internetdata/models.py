@@ -10,6 +10,7 @@ them so a field this pinned spec predates is still reachable.
 from __future__ import annotations
 
 import datetime
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal, get_args
 
@@ -177,12 +178,12 @@ def to_database(body: dict[str, Any]) -> Database:
         base=_present(body, "base", str),
         name=_present(body, "name", str),
         summary=_present(body, "summary", str),
-        standing=_present(body, "standing", str),
-        license_type=_nullable(body, "license_type", str),
-        starts=_datetime(body["starts"]),
-        expires=_datetime(body["expires"]),
-        renews_at=_datetime(body["renews_at"]),
-        notice_due_at=_datetime(body["notice_due_at"]),
+        standing=_one_of(_present(body, "standing", str), STANDINGS, "standing"),
+        license_type=_one_of(_nullable(body, "license_type", str), LICENSE_TYPES, "license_type"),
+        starts=_datetime(body["starts"], "starts"),
+        expires=_datetime(body["expires"], "expires"),
+        renews_at=_datetime(body["renews_at"], "renews_at"),
+        notice_due_at=_datetime(body["notice_due_at"], "notice_due_at"),
         versions=tuple(to_version(v) for v in _present(body, "versions", list)),
         raw=body,
         open=_present(body, "open", bool),
@@ -190,26 +191,37 @@ def to_database(body: dict[str, Any]) -> Database:
 
 
 def to_version(body: dict[str, Any]) -> DatabaseVersion:
+    sample_formats = _nullable(body, "sample_formats", list, absent=True)
     return DatabaseVersion(
         id=_present(body, "id", str),
         version=_present(body, "version", int),
         summary=_present(body, "summary", str),
         formats=_strings(_present(body, "formats", list), "formats"),
-        sample_formats=_optional_tuple(body.get("sample_formats")),
+        sample_formats=None
+        if sample_formats is None
+        else _strings(sample_formats, "sample_formats"),
     )
 
 
 def to_metadata(body: dict[str, Any]) -> DatabaseMetadata:
+    schema = _present(body, "schema", dict)
+    sample = _of_type(body.get("sample", {}), "sample", dict)
     return DatabaseMetadata(
         id=_present(body, "id", str),
-        updated=datetime.date.fromisoformat(body["updated"]),
+        updated=_date(_present(body, "updated", str), "updated"),
         entries=_present(body, "entries", int),
         schema={
-            fmt: tuple(to_column(c) for c in columns) for fmt, columns in body["schema"].items()
+            fmt: tuple(
+                to_column(_of_type(c, "schema", dict)) for c in _of_type(cols, "schema", list)
+            )
+            for fmt, cols in schema.items()
         },
         size=_sizes(_present(body, "size", dict), "size"),
-        update_freq=body.get("update_freq"),
-        sample={fmt: tuple(rows) for fmt, rows in body.get("sample", {}).items()},
+        update_freq=_nullable(body, "update_freq", str, absent=True),
+        sample={
+            fmt: tuple(_of_type(row, "sample", dict) for row in _of_type(rows, "sample", list))
+            for fmt, rows in sample.items()
+        },
         raw=body,
         sample_size=_sizes(body["sample_size"], "sample_size")
         if body.get("sample_size") is not None
@@ -222,7 +234,7 @@ def to_column(body: dict[str, Any]) -> MetadataColumn:
     return MetadataColumn(
         name=_present(body, "name", str),
         type=_present(body, "type", str),
-        description=body.get("description"),
+        description=_nullable(body, "description", str, absent=True),
     )
 
 
@@ -230,13 +242,13 @@ def to_download(body: dict[str, Any]) -> Download:
     return Download(
         dataset_id=_present(body, "dataset_id", str),
         format=_present(body, "format", str),
-        outcome=_present(body, "outcome", str),
-        created=datetime.datetime.fromisoformat(body["created"]),
+        outcome=_one_of(_present(body, "outcome", str), get_args(Outcome), "outcome"),
+        created=_date_time(_present(body, "created", str), "created"),
         bytes=_nullable(body, "bytes", int),
         http_status=_nullable(body, "http_status", int),
-        apikey_id=body["apikey_id"],
-        client_ip=body["client_ip"],
-        user_agent=body["user_agent"],
+        apikey_id=_nullable(body, "apikey_id", str),
+        client_ip=_nullable(body, "client_ip", str),
+        user_agent=_nullable(body, "user_agent", str),
         sample=_present(body, "sample", bool),
         open=_present(body, "open", bool),
     )
@@ -273,25 +285,74 @@ def _strings(values: list[Any], name: str) -> tuple[Any, ...]:
     return tuple(_of_type(v, name, str) for v in values)
 
 
+def _one_of(value: Any, allowed: tuple[str, ...], name: str) -> Any:
+    """`value`, a member of `allowed`, or None. One outside it is a value this client was not
+    built for: `license_type` came back as served while its type promised one of three, and
+    `standing` beside it was refused (2.9.2, measured 2026-10-25)."""
+    if value is not None and value not in allowed:
+        raise ValueError(f"{name} is not one of {', '.join(allowed)}: {value!r}")
+    return value
+
+
 def _sizes(sizes: Any, name: str) -> dict[str, int]:
     return {fmt: _of_type(n, name, int) for fmt, n in _of_type(sizes, name, dict).items()}
 
 
-def _optional_tuple(value: Any) -> tuple[Any, ...] | None:
-    return tuple(value) if value is not None else None
-
-
-def _datetime(value: Any) -> datetime.datetime | None:
+def _datetime(value: Any, name: str) -> datetime.datetime | None:
     """A NULLABLE wire timestamp. A license with no end date carries `expires: null`.
 
-    `fromisoformat` only learned to read a trailing `Z` in 3.11, which is one of the
-    three reasons this package floors there. A value that is neither null nor readable
-    raises, and the caller reports it as the server's failure rather than as None, which
-    would quietly read as "no end date".
+    A value that is neither null nor readable raises, and the caller reports it as the
+    server's failure rather than as None, which would quietly read as "no end date".
     """
-    if value is None:
-        return None
-    return datetime.datetime.fromisoformat(value)
+    return None if value is None else _date_time(value, name)
+
+
+# The spec's `date-time` and `date` are RFC 3339's, and only those are read: `fromisoformat`
+# took a date-time with no offset as a naive datetime, which no aware one can be compared
+# with, a date alone as midnight, `+0500`, `+05`, `+05:00:30`, `+05:60` as an hour more,
+# a space for the `T`, no seconds, a comma for the point, week dates and `20261005`
+# (2.9.2, measured 2026-10-25). RFC 3339 allows a lowercase `t` and `z`, which it refused.
+_DIGITS2 = "([0-9]{2})"
+_FULL_DATE = re.compile(rf"([0-9]{{4}})-{_DIGITS2}-{_DIGITS2}")
+_DATE_TIME = re.compile(
+    rf"([0-9]{{4}})-{_DIGITS2}-{_DIGITS2}[Tt]{_DIGITS2}:{_DIGITS2}:{_DIGITS2}(?:\.([0-9]+))?"
+    rf"(?:[Zz]|([+-]){_DIGITS2}:{_DIGITS2})"
+)
+
+
+def _date(value: str, name: str) -> datetime.date:
+    match = _FULL_DATE.fullmatch(value)
+    if match is None:
+        raise ValueError(f"{name} is not an RFC 3339 date: {value!r}")
+    # A day its month lacks, 30 February, raises here.
+    return datetime.date(*(int(part) for part in match.groups()))
+
+
+def _date_time(value: Any, name: str) -> datetime.datetime:
+    match = _DATE_TIME.fullmatch(_of_type(value, name, str))
+    if match is None:
+        raise ValueError(f"{name} is not an RFC 3339 date-time: {value!r}")
+    year, month, day, hour, minute, second, fraction, sign, offset_hour, offset_minute = (
+        match.groups()
+    )
+    zone = datetime.UTC
+    if sign is not None:
+        if int(offset_hour) > 23 or int(offset_minute) > 59:
+            raise ValueError(f"{name} has no such offset: {value!r}")
+        offset = datetime.timedelta(hours=int(offset_hour), minutes=int(offset_minute))
+        zone = datetime.timezone(-offset if sign == "-" else offset)
+    # A day its month lacks, an hour of 24 and a leap second's 60 raise here; past six
+    # digits a fraction is cut, as `fromisoformat` cuts it.
+    return datetime.datetime(
+        int(year),
+        int(month),
+        int(day),
+        int(hour),
+        int(minute),
+        int(second),
+        int((fraction or "")[:6].ljust(6, "0")),
+        tzinfo=zone,
+    )
 
 
 @dataclass(frozen=True, slots=True)
