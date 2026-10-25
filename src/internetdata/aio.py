@@ -35,6 +35,7 @@ from ._core import (
     authorization_url,
     build_async_transfer_client,
     build_client,
+    check_retries,
     check_timeout,
     checksums_of,
     create_pkce,
@@ -109,7 +110,7 @@ class AsyncInternetData:
         self._client = build_client(api_key, base_url, timeout, transport)
         self._base_url = base_url
         self._transfer = build_async_transfer_client(timeout, transport)
-        self._retries = retries
+        self._retries = check_retries(retries)
         self._timeout = timeout
         self.database = AsyncDatabaseApi(self)
         self.oauth = AsyncOauthApi(self)
@@ -133,7 +134,7 @@ class AsyncInternetData:
     def _bound(self, timeout: float | None) -> float | None:
         return self._timeout if timeout is None else check_timeout(timeout)
 
-    async def _retrying(self, call: Callable[[], Awaitable[T]], retries: int) -> T:
+    async def _retrying(self, call: Callable[[], Awaitable[T]], retries: float) -> T:
         attempt = 0
         while True:
             try:

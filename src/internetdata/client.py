@@ -30,6 +30,7 @@ from ._core import (
     authorization_url,
     build_client,
     build_transfer_client,
+    check_retries,
     check_timeout,
     checksums_of,
     create_pkce,
@@ -94,6 +95,10 @@ class InternetData:
     Anything else that is not a finite number greater than 0 is a `ValueError` where it is
     set, rather than a failure of every call.
 
+    `retries` is how many times a failed attempt is retried, 2 unless given: a whole number
+    from 0, or `math.inf` to retry until the call succeeds. Anything else is a `ValueError`
+    here too.
+
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
     """
@@ -117,7 +122,7 @@ class InternetData:
         self._client = build_client(api_key, base_url, timeout, transport)
         self._base_url = base_url
         self._transfer = build_transfer_client(timeout, transport)
-        self._retries = retries
+        self._retries = check_retries(retries)
         self._timeout = timeout
         self.database = DatabaseApi(self)
         self.oauth = OauthApi(self)
@@ -141,7 +146,7 @@ class InternetData:
     def _bound(self, timeout: float | None) -> float | None:
         return self._timeout if timeout is None else check_timeout(timeout)
 
-    def _retrying(self, call: Callable[[], T], retries: int) -> T:
+    def _retrying(self, call: Callable[[], T], retries: float) -> T:
         attempt = 0
         while True:
             try:

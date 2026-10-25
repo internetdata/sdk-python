@@ -167,21 +167,42 @@ def check_timeout(timeout: float | None) -> float | None:
     `server_error` blaming the API. So is anything past `WAIT_CEILING`, infinity
     included, since the sync client's wait cannot hold it: 1e300 failed every call with
     a raw `OverflowError` (2.6.0, measured 2026-09-30). None is the spelling for no bound.
+
+    Compared rather than handed to `math.isfinite`, which raised a raw `OverflowError` for
+    an integer too large for a float, such as 10**400 (2.9.2, measured 2026-10-25). NaN
+    fails both comparisons.
     """
     if timeout is None:
         return None
     if (
         isinstance(timeout, bool)
         or not isinstance(timeout, int | float)
-        or not math.isfinite(timeout)
-        or timeout <= 0
-        or timeout > WAIT_CEILING
+        or not 0 < timeout <= WAIT_CEILING
     ):
         raise ValueError(
             f"timeout must be a number of seconds greater than 0 and at most "
             f"{WAIT_CEILING:.0f}, or None for no bound, not {timeout!r}"
         )
     return timeout
+
+
+def check_retries(retries: float) -> float:
+    """`retries`, once it is a count of retries: a whole number from 0, or `math.inf` to
+    retry a failing call until it succeeds.
+
+    Refused where it is SET, because nothing downstream refuses it: NaN compares false with
+    every attempt number, so a failing call was retried until it succeeded, a negative read
+    as 0, 1.5 as two retries, and a string or None raised a raw `TypeError` out of every
+    call that failed, a 404 included (2.9.2, measured 2026-10-25).
+    """
+    if (
+        isinstance(retries, bool)
+        or not isinstance(retries, int | float)
+        or not retries >= 0
+        or (isinstance(retries, float) and not (retries.is_integer() or retries == math.inf))
+    ):
+        raise ValueError(f"retries must be a whole number from 0, or math.inf, not {retries!r}")
+    return retries
 
 
 def storage_refusal(res: httpx.Response) -> InternetDataError:
@@ -576,7 +597,7 @@ def checksums_of(body: dict[str, Any]) -> dict[str, str]:
     return digests
 
 
-def retry_delay(err: InternetDataError, attempt: int, retries: int) -> float | None:
+def retry_delay(err: InternetDataError, attempt: int, retries: float) -> float | None:
     """How long to wait before attempt `attempt + 1`, or None when there must not be one.
 
     A server-supplied `Retry-After` wins over the backoff schedule outright: it is the

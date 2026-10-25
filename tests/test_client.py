@@ -538,6 +538,51 @@ def test_retries_are_configurable_on_the_client(make_client: ClientFactory) -> N
     assert len(stub.requests) == 1
 
 
+@pytest.mark.parametrize("client", [InternetData, AsyncInternetData])
+@pytest.mark.parametrize(
+    "retries", [-1, float("nan"), 1.5, float("-inf"), "2", None, True, 10**400 * -1]
+)
+def test_a_retry_count_that_is_not_a_whole_number_from_0_is_refused_when_the_client_is_built(
+    client: type[InternetData | AsyncInternetData], retries: Any
+) -> None:
+    """Accepted by 2.9.2: NaN retried a failing call until it succeeded, -1 read as 0, 1.5 as
+    two retries, and a string or None raised a raw TypeError out of every failing call."""
+    with pytest.raises(ValueError, match="retries"):
+        client(API_KEY, retries=retries)
+
+
+@pytest.mark.parametrize("retries", [0, 2, 2.0])
+def test_a_whole_retry_count_is_what_a_failing_call_spends(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, retries: float
+) -> None:
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    stub = Stub({LIST_PATH: {"status": 503, "body": {"rc": "UNAVAILABLE"}}})
+    client = make_client(transport=stub.transport, retries=retries)
+
+    with pytest.raises(InternetDataError):
+        client.database.list()
+
+    assert len(stub.requests) == retries + 1
+
+
+def test_an_infinite_retry_count_retries_until_the_call_succeeds(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        if len(sent) <= 6:
+            return httpx.Response(503, json={"rc": "UNAVAILABLE"})
+        return httpx.Response(200, json={"databases": []})
+
+    client = make_client(transport=httpx.MockTransport(handler), retries=float("inf"))
+
+    assert client.database.list() == []
+    assert len(sent) == 7
+
+
 def test_a_spent_quota_is_never_retried(make_client: ClientFactory) -> None:
     stub = Stub({LIST_PATH: {"status": 429, "body": {"rc": "QUOTA_EXCEEDED"}}})
     client = make_client(transport=stub.transport, retries=3)
@@ -745,7 +790,7 @@ def test_a_per_call_timeout_bounds_a_trickling_body_and_leaves_the_clients_own_a
     _assert_bounded_by(default, CLIENT_TIMEOUT)
 
 
-@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), 1e300, "30", True])
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), 1e300, 10**400, "30", True])
 @pytest.mark.parametrize("call", PER_CALL)
 def test_a_per_call_timeout_no_attempt_can_meet_is_refused_before_any_request(
     make_client: ClientFactory, call: str, timeout: Any
@@ -799,7 +844,7 @@ def test_the_default_timeout_is_thirty_seconds() -> None:
 
 @pytest.mark.parametrize("client", [InternetData, AsyncInternetData])
 @pytest.mark.parametrize(
-    "timeout", [0, -1, 0.0, float("nan"), float("inf"), 9223372037, 1e300, "30", True]
+    "timeout", [0, -1, 0.0, float("nan"), float("inf"), 9223372037, 1e300, 10**400, "30", True]
 )
 def test_a_timeout_no_attempt_can_meet_is_refused_when_the_client_is_built(
     client: type[InternetData | AsyncInternetData], timeout: Any
