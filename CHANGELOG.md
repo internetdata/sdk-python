@@ -2,6 +2,13 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.3 - 2026-10-25
+
+### Fixes
+
+- Refuse a retry count that is not a whole number from 0 ([`5a29d59`](https://github.com/internetdata/sdk-python/commit/5a29d590e1c8a5396ec48a18c7c7813b1ef09f0c))
+- Retry a database answer whose dates or members break the spec ([`496e1e1`](https://github.com/internetdata/sdk-python/commit/496e1e1fc11e15cc9d472d7f23651b52a99cb63c))
+
 ## 2.9.2 - 2026-10-21
 
 ### Fixes
