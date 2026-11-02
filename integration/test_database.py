@@ -64,7 +64,7 @@ def test_the_catalog_answers_the_schema_the_client_was_generated_from() -> None:
         assert family.license_type is None or family.license_type in RIGHTS, (
             f"{family.base} carries an undocumented right {family.license_type!r}"
         )
-        # A license covers the family, and these are the ids the other calls take.
+        # A license covers the family, and these are the IDs the other calls take.
         assert family.versions, f"{family.base} carries no versions"
         for version in family.versions:
             assert version.id.startswith(family.base), (
@@ -317,7 +317,7 @@ def transferred() -> Transfer:
         target = licensed_version(client)
         meta = client.database.metadata(target.id)
         size = meta.size.get(FORMAT, 0)
-        # Budgeted BEFORE a byte moves: this is what stands between a mistaken id and
+        # Budgeted BEFORE a byte moves: this is what stands between a mistaken ID and
         # several gigabytes through a CI runner.
         assert 0 < size <= CEILING, (
             f"{target.id}.{FORMAT} is {size} bytes, past the {CEILING} ceiling, so it is "
