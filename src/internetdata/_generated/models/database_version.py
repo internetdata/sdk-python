@@ -16,11 +16,11 @@ T = TypeVar("T", bound="DatabaseVersion")
 class DatabaseVersion:
     """
     Attributes:
-        id (str): The versioned id. Pass this to `download`, `checksum` and `metadata`. Example: vpn_ip_v1.
+        id (str): The versioned ID. Pass this to `download`, `checksum` and `metadata`. Example: vpn_ip_v1.
         version (int):  Example: 1.
         summary (str):
         formats (list[DatabaseFormat]): The formats this version is BUILT in. Asking for another is a 400,
-            not a gap - the `_provider` catalogs are keyed by provider id, so no
+            not a gap - the `_provider` catalogs are keyed by provider ID, so no
             MMDB exists for them.
         sample_formats (list[DatabaseFormat] | Unset): The formats an evaluation sample is published in, if any.
     """

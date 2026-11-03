@@ -23,7 +23,7 @@ T = TypeVar("T", bound="Database")
 class Database:
     """One database FAMILY, with your organization's license beside it. A
     license covers the family, while a download names a specific version,
-    so the ids passed to `download` and `checksum` come from `versions`.
+    so the IDs passed to `download` and `checksum` come from `versions`.
 
         Attributes:
             base (str): The family, e.g. `vpn_ip`. What a license is held against. Example: vpn_ip.
