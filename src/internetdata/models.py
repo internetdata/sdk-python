@@ -39,7 +39,7 @@ Format = Literal["csvgz", "mmdb"]
 
 Which of them a given version HAS is `DatabaseVersion.formats`; asking for another is a
 `bad_request` rather than a gap, because the `_provider` catalogs are keyed by provider
-id and no MMDB exists for them.
+ID and no MMDB exists for them.
 """
 
 Standing = Literal["licensed", "expired", "unlicensed"]

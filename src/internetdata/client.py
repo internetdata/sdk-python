@@ -184,7 +184,7 @@ class DatabaseApi:
         for the key you are holding, so a listing held from one key is not an answer for
         another.
 
-        A license covers a FAMILY, while a download names a version, so the ids for the
+        A license covers a FAMILY, while a download names a version, so the IDs for the
         other calls come from each entry's `versions`.
 
         `timeout` bounds each attempt at this call alone, in place of the client's.

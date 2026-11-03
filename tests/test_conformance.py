@@ -168,7 +168,7 @@ def test_the_listing_is_returned_exactly_as_served(make_client: ClientFactory) -
 def test_no_catalog_is_compiled_into_the_client(make_client: ClientFactory) -> None:
     """An empty listing must stay empty.
 
-    This is the mistake worth guarding: a client that knows the published database ids -
+    This is the mistake worth guarding: a client that knows the published database IDs -
     from a bundled table, an enum, or a merge with anything - would hand back a family the
     server deliberately withheld, and the leak answers 200 while moving no bytes.
     """

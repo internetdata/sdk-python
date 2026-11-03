@@ -38,7 +38,7 @@ with InternetData(api_key) as client:
 
 ### The catalog
 
-`list` answers database FAMILIES. A license is held against a family, while a download names a specific version, so the ids the other calls take come from each family's `versions`:
+`list` answers database FAMILIES. A license is held against a family, while a download names a specific version, so the IDs the other calls take come from each family's `versions`:
 
 ```python
 for family in client.database.list():

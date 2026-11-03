@@ -128,7 +128,7 @@ def error_from_response(status: int, headers: httpx.Headers, body: Any) -> Inter
     """Classify a failed response.
 
     Everything outside the four named statuses is decided by its RANGE rather than by an
-    enumerated list, which is the whole point: a 404 from a database id that does not
+    enumerated list, which is the whole point: a 404 from a database ID that does not
     exist has to land on a client error, and mapping 400/401/403/429 and letting the rest
     fall through to `server_error` retries it twice before failing. Three of the four
     first SDKs shipped exactly that bug, so the shared corpus pins both 404 shapes.

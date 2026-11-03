@@ -1,7 +1,7 @@
 """The whole API, against the real staging deployment, through the PUBLISHED package.
 
 The transfer is budgeted before it starts. `metadata` publishes a size per format, and that
-size is checked against the ceiling below FIRST, so a mistaken database id can never
+size is checked against the ceiling below FIRST, so a mistaken database ID can never
 quietly pull one of the multi-gigabyte families through CI.
 
 Nothing here hardcodes which families the key is licensed for. The organization behind the
@@ -279,7 +279,7 @@ def licensed_version(client: InternetData) -> Target:
 
 
 def unlicensed_version(client: InternetData) -> Target:
-    """A real catalog id this key holds no license for."""
+    """A real catalog ID this key holds no license for."""
     for family in catalog(client):
         if family.standing == "licensed":
             continue
