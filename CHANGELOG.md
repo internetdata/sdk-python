@@ -2,6 +2,13 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.4 - 2026-11-03
+
+### Fixes
+
+- Re-pin the spec to 2026.11.02: ID and IDs in its descriptions ([`3eb09a6`](https://github.com/internetdata/sdk-python/commit/3eb09a6c5c375560eaa3297d85053ab527d51ec8))
+- Write ID and IDs in prose, never id or ids ([`6f2e980`](https://github.com/internetdata/sdk-python/commit/6f2e9804321aa68f2818fcc651f355adecf532bd))
+
 ## 2.9.3 - 2026-10-25
 
 ### Fixes
