@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.6 - 2026-11-06
+
+### Fixes
+
+- End a device poll for a NaN lifetime, and once a wait hits the deadline ([`856adea`](https://github.com/internetdata/sdk-python/commit/856adea678d75c23ec24567500c1ac8975d2c6a0))
+
 ## 2.9.5 - 2026-11-06
 
 ### Fixes
