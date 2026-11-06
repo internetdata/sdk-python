@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.9.5 - 2026-11-06
+
+### Fixes
+
+- Re-pin the spec to 2026.11.05: the download's build parameter ([`e3d517c`](https://github.com/internetdata/sdk-python/commit/e3d517c301100738ea7f3082da4abf2dd89c3b1d))
+
 ## 2.9.4 - 2026-11-03
 
 ### Fixes
