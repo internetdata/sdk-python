@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.10.0 - 2026-11-07
+
+### Features
+
+- Download a named build: download_url, download and download_bytes take build ([`a3b2622`](https://github.com/internetdata/sdk-python/commit/a3b262202a599036a5471f8a0973afb9b93de087))
+
 ## 2.9.6 - 2026-11-06
 
 ### Fixes
