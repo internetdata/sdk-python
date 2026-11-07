@@ -179,6 +179,56 @@ def test_download_url_hands_back_the_link_without_fetching_it(
     assert served.paths() == [DOWNLOAD_PATH], "the link was fetched as well as returned"
 
 
+def test_a_build_goes_on_the_download_request_and_none_without_one(
+    make_client: ClientFactory, tmp_path: Path
+) -> None:
+    served = origin(make_client)
+    database = served.client.database
+
+    database.download_url("bogon_ip_v1", "csvgz", build="20261105.0t53s5")
+    database.download_bytes("bogon_ip_v1", "csvgz", build="20261105.0t53s5")
+    database.download("bogon_ip_v1", "csvgz", tmp_path / "built.csv.gz", build="20261105.0t53s5")
+    database.download_url("bogon_ip_v1", "csvgz", build="")
+    database.download_bytes("bogon_ip_v1", "csvgz")
+
+    named = {"id": "bogon_ip_v1", "format": "csvgz", "build": "20261105.0t53s5"}
+    live = {"id": "bogon_ip_v1", "format": "csvgz"}
+    asked = [dict(r.url.params) for r in served.requests if r.url.path == DOWNLOAD_PATH]
+    assert asked == [named, named, named, live, live]
+
+
+def test_a_build_that_is_no_string_is_refused_with_nothing_sent(
+    make_client: ClientFactory, tmp_path: Path
+) -> None:
+    served = origin(make_client)
+    database = served.client.database
+
+    with pytest.raises(TypeError, match="build"):
+        database.download_url("bogon_ip_v1", "csvgz", build=20261105)
+    with pytest.raises(TypeError, match="build"):
+        database.download_bytes("bogon_ip_v1", "csvgz", build=b"20261105.0t53s5")
+    with pytest.raises(TypeError, match="build"):
+        database.download("bogon_ip_v1", "csvgz", tmp_path / "x", build=["20261105.0t53s5"])
+    assert served.requests == []
+
+
+def test_a_gone_build_is_a_bad_request_asked_once(make_client: ClientFactory) -> None:
+    seen: list[httpx.Request] = []
+
+    def gone(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(410, json={"rc": "BUILD_GONE"})
+
+    client = make_client(api_key=API_KEY, base_url=API, transport=httpx.MockTransport(gone))
+
+    with pytest.raises(InternetDataError) as caught:
+        client.database.download_url("bogon_ip_v1", "csvgz", build="20261029.aaaaaa")
+    assert caught.value.kind == "bad_request"
+    assert caught.value.retryable is False
+    assert caught.value.message == "BUILD_GONE"
+    assert len(seen) == 1
+
+
 # The link is the whole answer for this method, and it is only useful because it carries
 # no credential of ours: it authorizes itself, so it can be handed to anything that speaks
 # HTTP without also handing over the key.

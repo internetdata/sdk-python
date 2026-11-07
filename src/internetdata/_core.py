@@ -23,6 +23,7 @@ from urllib.parse import quote
 import httpx
 
 from ._generated.client import AuthenticatedClient, Client
+from ._generated.types import UNSET, Unset
 from .errors import InternetDataError, error_from_response, oauth_error_from
 from .models import Database, Download, Pkce, to_database, to_download
 
@@ -156,6 +157,16 @@ def check_api_key(api_key: str | None) -> str | None:
     if any(ord(char) < 0x20 or ord(char) >= 0x7F for char in key):
         raise ValueError("api_key holds a control character or one outside ASCII")
     return key or None
+
+
+def check_build(build: str | None) -> str | Unset:
+    """`build` as the download takes it: unset for None or an empty name, so a value read
+    from an unset setting downloads the live build."""
+    if build is None or build == "":
+        return UNSET
+    if not isinstance(build, str):
+        raise TypeError(f"build must be a build's name, a string, not {build!r}")
+    return build
 
 
 def check_timeout(timeout: float | None) -> float | None:

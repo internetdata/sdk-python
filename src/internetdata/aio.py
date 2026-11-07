@@ -35,6 +35,7 @@ from ._core import (
     authorization_url,
     build_async_transfer_client,
     build_client,
+    check_build,
     check_retries,
     check_timeout,
     checksums_of,
@@ -231,7 +232,12 @@ class AsyncDatabaseApi:
         return await self._retrying(call)
 
     async def download_url(
-        self, database_id: str, format: Format, *, timeout: float | None = None
+        self,
+        database_id: str,
+        format: Format,
+        *,
+        build: str | None = None,
+        timeout: float | None = None,
     ) -> str:
         """The time-limited URL for one database file.
 
@@ -241,9 +247,15 @@ class AsyncDatabaseApi:
         gigabytes; the link authorizes the START of a transfer, so one already running is
         not interrupted when it lapses.
 
+        `build` names one build of the database, as a `database.updated` webhook gives it
+        (`20261105.0t53s5`), so the file is the one whose `sha256` the webhook carries.
+        None, the default, is the build that is live. A build is kept 7 days; past that
+        the call raises `bad_request` with the message `BUILD_GONE`.
+
         `timeout` bounds each attempt at MINTING the link, which is an ordinary API
         request, and says nothing about the transfer you then run with it.
         """
+        build_ = check_build(build)
 
         async def call() -> str:
             res = await request_async(
@@ -252,12 +264,20 @@ class AsyncDatabaseApi:
                 self._bound(timeout),
                 id=database_id,
                 format_=DatabaseFormat(format),
+                build=build_,
             )
             return redirect_location(res)
 
         return await self._retrying(call)
 
-    async def download(self, database_id: str, format: Format, path: str | os.PathLike[str]) -> int:
+    async def download(
+        self,
+        database_id: str,
+        format: Format,
+        path: str | os.PathLike[str],
+        *,
+        build: str | None = None,
+    ) -> int:
         """Download one database file to `path`, and return the bytes written.
 
         The bytes are streamed straight to disk, so nothing larger than a chunk is ever
@@ -274,7 +294,7 @@ class AsyncDatabaseApi:
         event loop would stall every other task in the process for the length of the
         transfer, which is the one thing an async caller cannot afford.
         """
-        res = await self._open_transfer(database_id, format)
+        res = await self._open_transfer(database_id, format, build)
         try:
             loop = asyncio.get_running_loop()
             written = 0
@@ -288,7 +308,9 @@ class AsyncDatabaseApi:
         finally:
             await res.aclose()
 
-    async def download_bytes(self, database_id: str, format: Format) -> bytes:
+    async def download_bytes(
+        self, database_id: str, format: Format, *, build: str | None = None
+    ) -> bytes:
         """Download one database file and hand back its bytes.
 
         **This holds the entire file in memory**, and the catalog spans seven orders of
@@ -296,7 +318,7 @@ class AsyncDatabaseApi:
         small end, where the bytes go straight into a parser, and use `download` for
         anything you have not checked `metadata` for.
         """
-        res = await self._open_transfer(database_id, format)
+        res = await self._open_transfer(database_id, format, build)
         try:
             body = await res.aread()
             assert_whole_transfer(res, len(body))
@@ -311,8 +333,10 @@ class AsyncDatabaseApi:
     #
     # Returns the response with its body still unread, so the caller decides whether a
     # database is going to disk or into memory.
-    async def _open_transfer(self, database_id: str, format: Format) -> httpx.Response:
-        url = await self.download_url(database_id, format)
+    async def _open_transfer(
+        self, database_id: str, format: Format, build: str | None
+    ) -> httpx.Response:
+        url = await self.download_url(database_id, format, build=build)
         transfer = self._owner._transfer
 
         async def call() -> httpx.Response:

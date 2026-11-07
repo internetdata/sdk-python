@@ -83,6 +83,14 @@ written = client.database.download("bogon_ip_v1", "mmdb", "./bogon_ip_v1.mmdb")
 
 Either way a short transfer fails rather than handing you a truncated file, and the key is never sent to object storage.
 
+Each of the three downloads the build that is live unless you name one. A `database.updated` webhook names the build it announces and carries its `sha256`, so a receiver that downloads after the next publish asks for that build to get the file the hash is of:
+
+```python
+client.database.download("vpn_ip_v1", "mmdb", "./vpn_ip_v1.mmdb", build=event["data"]["build"])
+```
+
+A build is kept 7 days. Past that the call raises `bad_request` with the message `BUILD_GONE`, and downloading without `build` fetches the live one.
+
 Verify what you fetched against the published digests:
 
 ```python
