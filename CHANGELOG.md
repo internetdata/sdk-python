@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.10.1 - 2026-11-09
+
+### Fixes
+
+- Re-pin the spec to 2026.11.08: the token and revoke descriptions ([`29bc11a`](https://github.com/internetdata/sdk-python/commit/29bc11ac7a3861021b2ccd23293504c2d5556443))
+
 ## 2.10.0 - 2026-11-07
 
 ### Features
