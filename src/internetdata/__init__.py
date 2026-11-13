@@ -2,16 +2,16 @@
 
     from internetdata import InternetData
 
-    with InternetData(api_key) as client:
-        for db in client.database.list():
-            print(db.base, db.standing)
+    with InternetData() as client:
+        print(client.lookup("146.70.116.130").asn.name)
 
-See https://internetdata.io for the API, and the README for downloads, checksums and
-what the catalog does and does not show you.
+No API key is needed to start. See https://internetdata.io for the API, and the README
+for batching, caching and the licensed database downloads.
 """
 
 from ._core import DEFAULT_BASE_URL
 from .aio import AsyncDatabaseApi, AsyncInternetData, AsyncOauthApi
+from .bogon import is_bogon
 from .client import DatabaseApi, InternetData, OauthApi
 from .errors import (
     ErrorKind,
@@ -24,20 +24,55 @@ from .models import (
     DATABASE_FORMATS,
     LICENSE_TYPES,
     STANDINGS,
+    AbuseContact,
+    Asn,
+    AsnPrefix,
+    AsnResult,
+    BitTorrentDetail,
+    CarrierDetail,
+    ClassDetail,
     ClientRegistration,
+    Company,
     Database,
     DatabaseMetadata,
     DatabaseVersion,
     DeviceAuthorization,
+    DisposableDetail,
+    DnsAddressRecord,
+    DnsCnameRecord,
+    DnsMxRecord,
+    DnsNsRecord,
+    DnsResolverDetail,
+    DomainDns,
+    DomainIpRange,
+    DomainIpRanges,
+    DomainResult,
     Download,
+    Entitlement,
+    EntitlementApikey,
+    EntitlementPlan,
+    EntitlementPlanTier,
+    EntitlementUsage,
+    Flag,
     Format,
+    HostedDomains,
     LicenseType,
+    Location,
     MetadataColumn,
     OauthMetadata,
     Outcome,
     Pkce,
+    ProxyDetail,
+    PubproxyDetail,
+    Result,
+    Rwhois,
+    SatelliteDetail,
+    SmtpDetail,
+    SshDetail,
     Standing,
     TokenResponse,
+    WebDetail,
+    Whois,
 )
 
 __version__ = "2.10.1"
@@ -47,21 +82,47 @@ __all__ = [
     "DEFAULT_BASE_URL",
     "LICENSE_TYPES",
     "STANDINGS",
+    "AbuseContact",
+    "Asn",
+    "AsnPrefix",
+    "AsnResult",
     "AsyncDatabaseApi",
     "AsyncInternetData",
     "AsyncOauthApi",
+    "BitTorrentDetail",
+    "CarrierDetail",
+    "ClassDetail",
     "ClientRegistration",
+    "Company",
     "Database",
     "DatabaseApi",
     "DatabaseMetadata",
     "DatabaseVersion",
     "DeviceAuthorization",
+    "DisposableDetail",
+    "DnsAddressRecord",
+    "DnsCnameRecord",
+    "DnsMxRecord",
+    "DnsNsRecord",
+    "DnsResolverDetail",
+    "DomainDns",
+    "DomainIpRange",
+    "DomainIpRanges",
+    "DomainResult",
     "Download",
+    "Entitlement",
+    "EntitlementApikey",
+    "EntitlementPlan",
+    "EntitlementPlanTier",
+    "EntitlementUsage",
     "ErrorKind",
+    "Flag",
     "Format",
+    "HostedDomains",
     "InternetData",
     "InternetDataError",
     "LicenseType",
+    "Location",
     "MetadataColumn",
     "OauthAccessDeniedError",
     "OauthApi",
@@ -70,7 +131,17 @@ __all__ = [
     "OauthMetadata",
     "Outcome",
     "Pkce",
+    "ProxyDetail",
+    "PubproxyDetail",
+    "Result",
+    "Rwhois",
+    "SatelliteDetail",
+    "SmtpDetail",
+    "SshDetail",
     "Standing",
     "TokenResponse",
+    "WebDetail",
+    "Whois",
     "__version__",
+    "is_bogon",
 ]

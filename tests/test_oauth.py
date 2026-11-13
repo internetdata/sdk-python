@@ -42,6 +42,8 @@ from internetdata import (
 CORPUS: dict[str, Any] = TESTDATA["oauth"]
 
 BASE_URL = "https://api.example.test"
+# Where the accessor asks for that base URL: the authorization server is on the apex.
+APEX = "https://example.test"
 DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 
 # Satisfies every operation's required members at once.
@@ -128,7 +130,7 @@ def test_each_operation_requests_its_endpoint_with_exactly_its_form_fields(
     assert _form_fields(req.content) == case["fields"]
 
 
-def test_metadata_is_a_get_of_the_discovery_document_under_the_base_url(
+def test_metadata_is_a_get_of_the_discovery_document_under_the_apex_of_the_base_url(
     make_client: ClientFactory,
 ) -> None:
     bound = LoopBound()
@@ -139,8 +141,41 @@ def test_metadata_is_a_get_of_the_discovery_document_under_the_base_url(
 
     [req] = stub.requests
     _assert_endpoint(req, CORPUS["endpoints"]["metadata"])
-    assert str(req.url) == f"{BASE_URL}{CORPUS['endpoints']['metadata']['path']}"
+    assert str(req.url) == f"{APEX}{CORPUS['endpoints']['metadata']['path']}"
     assert req.content == b""
+
+
+# The authorization server issues at the apex, not on the API host, so the accessor alone
+# derives its host: `api.` dropped, `api-<env>.` becoming `<env>.`, anything else as given.
+@pytest.mark.parametrize(
+    ("base_url", "apex"),
+    [
+        ("https://api.internetdata.io", "https://internetdata.io"),
+        ("https://api-staging.internetdata.io/", "https://staging.internetdata.io"),
+        ("https://API.example.test:8443//", "https://example.test:8443"),
+        ("https://internetdata.io", "https://internetdata.io"),
+        ("https://staging.internetdata.io", "https://staging.internetdata.io"),
+        ("http://127.0.0.1:8080", "http://127.0.0.1:8080"),
+        ("https://apis.example.test", "https://apis.example.test"),
+    ],
+)
+def test_the_accessor_asks_the_apex_of_the_api_host(
+    make_client: ClientFactory, base_url: str, apex: str
+) -> None:
+    bound = LoopBound()
+    stub = OauthStub([{"status": 200, "body": EVERY_REQUIRED_MEMBER}], bound)
+    client = make_client(base_url=base_url, transport=stub.transport)
+
+    settle(lambda: client.oauth.metadata(), bound)
+    url = client.oauth.authorization_url("internetdata-cli", "http://127.0.0.1/cb", "c" * 43)
+
+    [req] = stub.requests
+    assert str(req.url) == f"{apex}{CORPUS['endpoints']['metadata']['path']}"
+    assert url.startswith(f"{apex}/oauth/authorize?"), url
+    settle(lambda: client.database.list(), bound)
+    assert str(stub.requests[-1].url).startswith(f"{base_url.rstrip('/').lower()}/api/v2/"), (
+        "a database call stays on the base URL"
+    )
 
 
 @pytest.mark.parametrize(
@@ -495,7 +530,7 @@ def test_an_authorization_url_leaves_out_an_empty_option_and_refuses_an_empty_va
 
     url = oauth.authorization_url(*args, scope="", state="", resource="")
 
-    assert url == case["expect"].replace(case["baseUrl"], BASE_URL)
+    assert url == case["expect"].replace(case["baseUrl"], APEX)
     with pytest.raises(ValueError, match="client_id"):
         oauth.authorization_url("", case["redirectUri"], case["codeChallenge"])
     with pytest.raises(ValueError, match="code_challenge"):
@@ -540,7 +575,7 @@ def test_register_posts_exactly_its_json_body(
     assert not isinstance(outcome, BaseException), f"settled with {outcome!r}"
     [req] = stub.requests
     _assert_endpoint(req, REGISTER["endpoint"])
-    assert str(req.url) == f"{BASE_URL}{REGISTER['endpoint']['path']}"
+    assert str(req.url) == f"{APEX}{REGISTER['endpoint']['path']}"
     assert req.headers["content-type"].startswith(REGISTER["contentType"])
     assert json.loads(req.content) == case["body"]
 

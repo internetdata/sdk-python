@@ -156,8 +156,24 @@ OAUTH_CALLS: dict[str, Callable[..., Any]] = {
     ),
 }
 
+# Every lookup, called with the keyword arguments given; each takes `retries` and `timeout`.
+# A batch carries an address's failure as its value, so it is raised here, as a lookup's is.
+LOOKUP_CALLS: dict[str, Callable[..., Any]] = {
+    "lookup": lambda client, **kw: client.lookup("9.9.9.9", **kw),
+    "lookup_asn": lambda client, **kw: client.lookup_asn(9009, **kw),
+    "lookup_domain": lambda client, **kw: client.lookup_domain("example.com", **kw),
+    "my_ip": lambda client, **kw: client.my_ip(**kw),
+    "my_entitlement": lambda client, **kw: client.my_entitlement(**kw),
+    "lookup_batch": lambda client, **kw: _raised(
+        client.lookup_batch(["9.9.9.9", "8.8.8.8"], **kw)["9.9.9.9"]
+    ),
+}
+
+# Every call that asks the API a question and reads its answer.
+ASKING: dict[str, Callable[..., Any]] = {**JSON_CALLS, **LOOKUP_CALLS}
+
 # Every call that takes a per-call timeout.
-PER_CALL: dict[str, Callable[..., Any]] = {**JSON_CALLS, **OAUTH_CALLS}
+PER_CALL: dict[str, Callable[..., Any]] = {**JSON_CALLS, **LOOKUP_CALLS, **OAUTH_CALLS}
 
 # The two transfers, which must REFUSE a per-call timeout rather than ignore one.
 TRANSFERS: dict[str, Callable[..., Any]] = {
@@ -327,6 +343,12 @@ JSON_CALL_PATHS = {
     "checksums": CHECKSUM_PATH,
     "downloads": DOWNLOADS_PATH,
     "download_url": DOWNLOAD_PATH,
+    "lookup": "/9.9.9.9",
+    "lookup_asn": "/asn/9009",
+    "lookup_domain": "/domain/example.com",
+    "my_ip": "/myip",
+    "my_entitlement": "/api/v1/entitlement",
+    "lookup_batch": "/batch",
 }
 
 UNREADABLE_2XX = {
@@ -340,7 +362,7 @@ UNREADABLE_2XX = {
 
 
 @pytest.mark.parametrize("body", UNREADABLE_2XX)
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", ASKING)
 def test_a_2xx_the_call_cannot_read_is_a_retried_server_error_with_its_status(
     make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, call: str, body: str
 ) -> None:
@@ -351,7 +373,7 @@ def test_a_2xx_the_call_cannot_read_is_a_retried_server_error_with_its_status(
     client = make_client(transport=stub.transport, retries=2)
 
     with pytest.raises(InternetDataError) as caught:
-        JSON_CALLS[call](client)
+        ASKING[call](client)
 
     assert caught.value.kind == "server_error"
     assert caught.value.status == 200
@@ -591,7 +613,7 @@ def test_an_rfc_3339_date_time_is_read_as_the_instant_it_names(
         (400, b"null", "bad_request"),
     ],
 )
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", ASKING)
 def test_a_4xx_is_classified_by_its_status_whatever_its_body(
     make_client: ClientFactory, call: str, status: int, body: bytes, kind: str
 ) -> None:
@@ -601,13 +623,13 @@ def test_a_4xx_is_classified_by_its_status_whatever_its_body(
     client = make_client(transport=stub.transport, retries=2)
 
     with pytest.raises(InternetDataError) as caught:
-        JSON_CALLS[call](client)
+        ASKING[call](client)
 
     assert (caught.value.kind, caught.value.status) == (kind, status)
     assert len(stub.requests) == 1
 
 
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", ASKING)
 def test_a_5xx_page_is_a_retried_server_error_with_its_status(
     make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, call: str
 ) -> None:
@@ -616,7 +638,7 @@ def test_a_5xx_page_is_a_retried_server_error_with_its_status(
     client = make_client(transport=stub.transport, retries=2)
 
     with pytest.raises(InternetDataError) as caught:
-        JSON_CALLS[call](client)
+        ASKING[call](client)
 
     assert (caught.value.kind, caught.value.status) == ("server_error", 503)
     assert len(stub.requests) == 3
@@ -826,13 +848,13 @@ def test_a_transport_failure_surfaces_as_a_network_error() -> None:
     assert caught.value.retryable is True
 
 
-@pytest.mark.parametrize("call", JSON_CALLS)
+@pytest.mark.parametrize("call", ASKING)
 def test_the_timeout_bounds_a_trickling_body_on_every_json_call(
     make_client: ClientFactory, call: str
 ) -> None:
     with SlowBody(trickle=TRICKLE) as server:
         client = make_client(base_url=server.url, timeout=TIMEOUT, retries=0)
-        elapsed, outcome = _timed(lambda: JSON_CALLS[call](client))
+        elapsed, outcome = _timed(lambda: ASKING[call](client))
 
     _assert_timed_out(outcome)
     _assert_one_bound(elapsed)
@@ -1030,3 +1052,10 @@ def _assert_bounded_by(elapsed: float, bound: float) -> None:
     assert bound - 0.05 <= elapsed < bound + SLACK, (
         f"gave up after {elapsed:.2f}s against a {bound}s bound"
     )
+
+
+def _raised(answer: object) -> object:
+    """A batch answer, raised when it is an error, so a batch fails the way a lookup does."""
+    if isinstance(answer, BaseException):
+        raise answer
+    return answer

@@ -10,14 +10,18 @@ from __future__ import annotations
 import asyncio
 import builtins
 import os
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from types import TracebackType
 from typing import Any, Self, TypeVar
 
 import httpx
 
 from ._core import (
+    BATCH_MAX,
     DEFAULT_BASE_URL,
+    DEFAULT_CACHE_MAX_SIZE,
+    DEFAULT_CACHE_TTL,
+    DEFAULT_CONCURRENCY,
     DEFAULT_DOWNLOADS_LIMIT,
     DEFAULT_RETRIES,
     DEFAULT_TIMEOUT,
@@ -29,19 +33,30 @@ from ._core import (
     OAUTH_TOKEN_PATH,
     POLL_DEADLINE_CAP,
     TRANSFER_CHUNK_BYTES,
+    Abandoned,
     AsyncClock,
+    Cache,
+    Flights,
     as_error,
     assert_whole_transfer,
     authorization_url,
+    batch_answers,
+    batch_body,
     build_async_transfer_client,
     build_client,
+    call_retries,
     check_build,
+    check_client_concurrency,
+    check_concurrency,
     check_retries,
     check_timeout,
     checksums_of,
+    chunked,
     create_pkce,
     databases_of,
     downloads_of,
+    landed_error,
+    oauth_base,
     oauth_body,
     oauth_request_async,
     parse_body,
@@ -60,23 +75,35 @@ from ._generated.api.database_v_2 import (
     list_databases,
     list_downloads,
 )
+from ._generated.api.entitlement import my_entitlement
+from ._generated.api.lookup import lookup_asn, lookup_batch, lookup_domain, lookup_ip, lookup_my_ip
 from ._generated.client import AuthenticatedClient
+from ._generated.models.batch_lookup_request import BatchLookupRequest
 from ._generated.models.database_format import DatabaseFormat
+from .bogon import bogon_result, is_bogon, unmapped
 from .errors import InternetDataError, OauthError, OauthExpiredTokenError
 from .models import (
+    AsnResult,
     ClientRegistration,
     Database,
     DatabaseMetadata,
     DeviceAuthorization,
+    DomainResult,
     Download,
+    Entitlement,
     Format,
     OauthMetadata,
     Pkce,
+    Result,
     TokenResponse,
+    to_asn_result,
     to_client_registration,
     to_device_authorization,
+    to_domain_result,
+    to_entitlement,
     to_metadata,
     to_oauth_metadata,
+    to_result,
     to_token_response,
 )
 
@@ -88,8 +115,9 @@ T = TypeVar("T")
 class AsyncInternetData:
     """A client for the InternetData API, for asyncio.
 
-    Identical in behavior to `InternetData`. Close it with `await client.aclose()`, or
-    use it as an async context manager.
+    Identical in behavior to `InternetData`, including the per-instance cache and the
+    bogon short-circuit. Close it with `await client.aclose()`, or use it as an async
+    context manager.
     """
 
     database: AsyncDatabaseApi
@@ -103,18 +131,312 @@ class AsyncInternetData:
         api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        retries: int = DEFAULT_RETRIES,
+        cache: bool = True,
+        cache_max_size: int = DEFAULT_CACHE_MAX_SIZE,
+        cache_ttl: float = DEFAULT_CACHE_TTL,
+        concurrency: int = DEFAULT_CONCURRENCY,
+        retries: float = DEFAULT_RETRIES,
         timeout: float | None = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         timeout = check_timeout(timeout)
+        concurrency = check_client_concurrency(concurrency)
         self._client = build_client(api_key, base_url, timeout, transport)
         self._base_url = base_url
+        self._oauth_base = oauth_base(base_url)
         self._transfer = build_async_transfer_client(timeout, transport)
+        self._cache = Cache(cache_max_size, cache_ttl) if cache else None
+        # Only a client that caches shares a request: without a cache every lookup is
+        # served, as `cache=False` promises.
+        self._flights = Flights(lambda: asyncio.get_running_loop().create_future())
+        self._concurrency = concurrency
         self._retries = check_retries(retries)
         self._timeout = timeout
         self.database = AsyncDatabaseApi(self)
         self.oauth = AsyncOauthApi(self)
+
+    def is_bogon(self, ip: str) -> bool:
+        """Whether an address is private, loopback, link-local, documentation, multicast
+        or otherwise not routable, including the IPv6 equivalents and the 6to4 and
+        Teredo ranges.
+
+        Answered from a local table, so it is a plain function rather than a coroutine.
+        """
+        return is_bogon(ip)
+
+    async def lookup(
+        self, ip: str, *, retries: float | None = None, timeout: float | None = None
+    ) -> Result:
+        """What every database says about one address.
+
+        A bogon is answered locally and never reaches the network. Everything else is
+        served, then cached for this instance. Calls that miss the cache while a request
+        for their address is in flight, a batch's included, await that request rather than
+        sending their own, and take its answer, sent under the options of the call that led
+        it. A caller cancelled while it leads one hands it on: a waiter asks again.
+        """
+        # Here as well as in _bound: a bogon or a cached answer returns before any request.
+        check_timeout(timeout)
+        call_retries(retries)
+        ip = unmapped(ip)
+        if is_bogon(ip):
+            return bogon_result(ip)
+        if self._cache is None:
+            return await self._serve(ip, retries, timeout)
+        while True:
+            hit = self._cache.get(ip)
+            if hit is not None:
+                return hit
+            led, joined = self._flights.board([ip])
+            if ip in led:
+                return await self._lead(ip, led[ip], retries, timeout)
+            try:
+                # Shielded, so a waiter cancelled cancels only itself.
+                result: Result = await asyncio.shield(joined[ip])
+                return result
+            except InternetDataError as err:
+                raise landed_error(err) from None
+            except Abandoned:
+                continue
+
+    async def _lead(
+        self, ip: str, flight: Any, retries: float | None, timeout: float | None
+    ) -> Result:
+        assert self._cache is not None
+        try:
+            # A request that landed between the miss and boarding cached its answer before
+            # it left the board, so it is found here.
+            result = self._cache.get(ip)
+            if result is None:
+                result = await self._serve(ip, retries, timeout)
+        except InternetDataError as err:
+            self._flights.land(ip, flight, err)
+            raise
+        except BaseException:
+            self._flights.land(ip, flight, Abandoned())
+            raise
+        self._cache.put(ip, result)
+        self._flights.land(ip, flight, result)
+        return result
+
+    async def _serve(self, ip: str, retries: float | None, timeout: float | None) -> Result:
+        async def call() -> Result:
+            res = await request_async(
+                lookup_ip, self._client, self._bound(timeout), decode=False, ip=ip
+            )
+            return parse_body(res, to_result)
+
+        return await self._retrying(call, self._retries if retries is None else retries)
+
+    async def lookup_asn(
+        self, asn: int, *, retries: float | None = None, timeout: float | None = None
+    ) -> AsnResult:
+        """What every database says about one autonomous system, by its number.
+
+        Sent as given, and refused by the API as `bad_request` when it cannot read it. Not
+        cached: the cache holds addresses.
+        """
+        call_retries(retries)
+
+        async def call() -> AsnResult:
+            res = await request_async(
+                lookup_asn, self._client, self._bound(timeout), decode=False, asn=asn
+            )
+            return parse_body(res, to_asn_result)
+
+        return await self._retrying(call, self._retries if retries is None else retries)
+
+    async def lookup_domain(
+        self, domain: str, *, retries: float | None = None, timeout: float | None = None
+    ) -> DomainResult:
+        """What every database says about one domain.
+
+        Sent as given, and refused by the API as `bad_request` when it cannot read it; an
+        internationalized name is answered under its punycode spelling. Not cached: the
+        cache holds addresses.
+        """
+        call_retries(retries)
+
+        async def call() -> DomainResult:
+            res = await request_async(
+                lookup_domain, self._client, self._bound(timeout), decode=False, domain=domain
+            )
+            return parse_body(res, to_domain_result)
+
+        return await self._retrying(call, self._retries if retries is None else retries)
+
+    async def my_ip(self, *, retries: float | None = None, timeout: float | None = None) -> Result:
+        """What every database says about the address this client is calling from.
+
+        The same answer `lookup` would give for that address, at the same cost against
+        your allowance. The address is the one our edge observed, so a call made through
+        a proxy or a VPN reports the exit it left through - usually the point of asking.
+
+        Deliberately NOT cached. The cache is keyed by address, and which address this
+        is IS the question: a machine that moves between networks would otherwise be
+        told where it used to be.
+        """
+
+        call_retries(retries)
+
+        async def call() -> Result:
+            res = await request_async(
+                lookup_my_ip, self._client, self._bound(timeout), decode=False
+            )
+            return parse_body(res, to_result)
+
+        return await self._retrying(call, self._retries if retries is None else retries)
+
+    async def my_entitlement(
+        self, *, retries: float | None = None, timeout: float | None = None
+    ) -> Entitlement:
+        """What this client's key is entitled to, and how much of it has been used.
+
+        Named for what it answers rather than `me`, which sits one letter from `my_ip`
+        and means something quite different: one is which address you are calling FROM,
+        the other is what the key you are calling WITH may spend.
+
+        Unlike a lookup there is no useful unauthenticated answer, so a client built
+        without a key gets an unauthorized error rather than a partial one.
+
+        Usage counts against the ALLOWANCE WINDOW - on a paid plan the anniversary of
+        the subscription, not the calendar month and not the billing period, and on the
+        free plan the UTC day - and it is the same number a lookup is gated on. It can
+        lag by a few seconds, because requests are counted in memory and flushed in
+        aggregate.
+
+        Deliberately NOT cached: the whole point is what has been spent, and a cached
+        answer is a wrong one within seconds of the next request.
+        """
+
+        call_retries(retries)
+
+        async def call() -> Entitlement:
+            res = await request_async(
+                my_entitlement, self._client, self._bound(timeout), decode=False
+            )
+            return parse_body(res, to_entitlement)
+
+        return await self._retrying(call, self._retries if retries is None else retries)
+
+    async def lookup_batch(
+        self,
+        ips: Iterable[str],
+        *,
+        concurrency: int | None = None,
+        retries: float | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Result | InternetDataError]:
+        """Look many addresses up in as few requests as possible.
+
+        Bogons are answered locally and cached answers are reused; everything else goes
+        to the batch endpoint in chunks of up to 1000 addresses, with at most
+        `concurrency` chunks in flight. Keyed by address rather than positional, so
+        duplicates in the input collapse to a single entry and the caller never has to
+        line two lists up. An address that fails carries its error as its value, so one
+        bad entry cannot lose the rest of the answers: the API reports a per-entry
+        failure with the status the single lookup would have answered, and a chunk that
+        fails as a whole marks every address in it. The batch endpoint needs a paid plan:
+        without a key every address in a request of two or more carries an
+        `unauthorized` error, and a free-plan key's request of two or more a
+        `bad_request` (HTTP 402). A request of one address is answered as its lookup
+        would be.
+
+        Each batch gets its own semaphore sized for THIS call, so a per-call concurrency
+        really is the ceiling rather than being silently capped by the client's. A per-call
+        `concurrency` below 1 is refused as `bad_request` before anything is sent.
+        """
+        check_concurrency(concurrency)
+        check_timeout(timeout)
+        call_retries(retries)
+        asked = list(dict.fromkeys(ips))
+        unique = list(dict.fromkeys(unmapped(ip) for ip in asked))
+        answers: dict[str, Result | InternetDataError] = {}
+        pending: list[str] = []
+        for ip in unique:
+            if is_bogon(ip):
+                answers[ip] = bogon_result(ip)
+                continue
+            hit = self._cache.get(ip) if self._cache is not None else None
+            if hit is not None:
+                answers[ip] = hit
+                continue
+            pending.append(ip)
+        # Each address with a request in flight awaits it, and the rest are boarded before
+        # any chunk is built. A request that landed since the cache was read cached its
+        # answer first, so a led address is looked up there once more before it is sent.
+        led, joined = self._flights.board(pending) if self._cache is not None else ({}, {})
+        send: list[str] = []
+        for ip in pending:
+            if ip in joined:
+                continue
+            hit = self._cache.get(ip) if ip in led and self._cache is not None else None
+            if hit is not None:
+                self._flights.land(ip, led[ip], hit)
+                answers[ip] = hit
+                continue
+            send.append(ip)
+        try:
+            if send:
+                workers = self._concurrency if concurrency is None else concurrency
+                gate = asyncio.Semaphore(max(1, workers))
+
+                async def one(chunk: list[str]) -> dict[str, Result | InternetDataError]:
+                    async with gate:
+                        return await self._lookup_chunk(chunk, retries, timeout, led)
+
+                for chunk_answers in await asyncio.gather(
+                    *(one(chunk) for chunk in chunked(send, BATCH_MAX))
+                ):
+                    answers.update(chunk_answers)
+        finally:
+            for ip, flight in led.items():
+                self._flights.land(ip, flight, Abandoned())
+        for ip, flight in joined.items():
+            try:
+                answers[ip] = await asyncio.shield(flight)
+            except InternetDataError as err:
+                answers[ip] = landed_error(err)
+            except Abandoned:
+                # Its leader stopped before the answer landed, so this one goes alone.
+                try:
+                    answers[ip] = await self.lookup(ip, retries=retries, timeout=timeout)
+                except InternetDataError as err:
+                    answers[ip] = err
+        return {ip: answers[unmapped(ip)] for ip in asked}
+
+    # One POST /batch, mapped back onto the addresses it was asked about. A chunk-level
+    # failure - the call refused, the transport failing, the retries exhausted - becomes
+    # every address's error, exactly as it would have been had each been looked up alone.
+    async def _lookup_chunk(
+        self,
+        chunk: list[str],
+        retries: float | None,
+        timeout: float | None,
+        led: dict[str, Any],
+    ) -> dict[str, Result | InternetDataError]:
+        async def call() -> dict[str, Any]:
+            res = await request_async(
+                lookup_batch,
+                self._client,
+                self._bound(timeout),
+                decode=False,
+                body=BatchLookupRequest(ips=list(chunk)),
+            )
+            return batch_body(res)
+
+        try:
+            body = await self._retrying(call, self._retries if retries is None else retries)
+        except InternetDataError as err:
+            answers: dict[str, Result | InternetDataError] = {ip: err for ip in chunk}
+        else:
+            answers = batch_answers(chunk, body)
+        for ip, answer in answers.items():
+            if self._cache is not None and isinstance(answer, Result):
+                self._cache.put(ip, answer)
+            if ip in led:
+                self._flights.land(ip, led[ip], answer)
+        return answers
 
     async def aclose(self) -> None:
         await self._client.get_async_httpx_client().aclose()
@@ -448,7 +770,7 @@ class AsyncOauthApi:
         `OauthApi.authorization_url`.
         """
         return authorization_url(
-            self._owner._base_url,
+            self._owner._oauth_base,
             client_id,
             redirect_uri,
             code_challenge,
@@ -541,4 +863,5 @@ class AsyncOauthApi:
         body: dict[str, Any] | None = None,
     ) -> httpx.Response:
         bound = self._owner._bound(timeout)
-        return await oauth_request_async(self._owner._client, method, path, form, bound, body)
+        url = f"{self._owner._oauth_base}{path}"
+        return await oauth_request_async(self._owner._client, method, url, form, bound, body)

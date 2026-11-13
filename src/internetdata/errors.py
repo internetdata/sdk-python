@@ -155,18 +155,20 @@ _NO_HEADERS = httpx.Headers()
 
 
 def _message_of(body: Any) -> str | None:
-    """The API's own result code, which is the whole error envelope.
+    """The API's own message: a lookup's `error`, or a database call's result code, `rc`.
 
-    `rc` is deliberately not an enum in the spec, so a code added later stays readable by
-    a client generated today. Passing it through verbatim is what keeps that promise: a
-    caller switching on `NOT_LICENSED` versus `LICENSE_EXPIRED` needs the string, not a
-    status.
+    The two APIs behind this host answer with different envelopes, so both are read here
+    and a caller never has to know which one they hit. `rc` is deliberately not an enum in
+    the spec, so a code added later stays readable by a client generated today. Passing it
+    through verbatim is what keeps that promise: a caller switching on `NOT_LICENSED` versus
+    `LICENSE_EXPIRED` needs the string, not a status.
     """
     if not isinstance(body, dict):
         return None
-    code = body.get("rc")
-    if isinstance(code, str) and code != "":
-        return code
+    for key in ("error", "rc"):
+        value = body.get(key)
+        if isinstance(value, str) and value != "":
+            return value
     return None
 
 

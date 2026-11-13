@@ -5,7 +5,7 @@
 
 The official Python client library for the [InternetData](https://internetdata.io) API.
 
-The library helps you browse the databases your organization is licensed for, check what is in each build before you fetch it, and download and verify the files.
+It tells you what every InternetData database says about an IP address, an AS or a domain: where it is, who runs it, whether it is a VPN, proxy, Tor node or hosting server, and what it serves. It also downloads the databases your organization is licensed for.
 
 ## Getting Started
 
@@ -16,6 +16,191 @@ pip install internetdata
 Requires Python 3.11 or newer. Type hints are included, and the package ships `py.typed`.
 
 ## Usage
+
+**No API key needed to start.** Unlimited, the free plan, answers `location`, `asn`, `company`, `abuse` and every flag but the VPN, proxy, hosting and CDN ones, limited per address per minute, with a key or without one.
+
+```python
+from internetdata import InternetData
+
+client = InternetData()
+
+result = client.lookup("146.70.116.130")
+print(result.location.country)    # 'AT'
+print(result.asn.name)            # 'M247 Europe SRL'
+print(result.company.name)        # who uses the address
+```
+
+The client holds an HTTP connection pool, so use it as a context manager, or call `client.close()` when you are done with it:
+
+```python
+with InternetData() as client:
+    print(client.lookup("146.70.116.130").asn.name)
+```
+
+### With an API key
+
+Every paid plan answers every field: the VPN, proxy, hosting and CDN flags, the detail behind each flag, the city, the Whois records and more. The plans differ only in how many lookups they include, and a free account tries every field, 100 lookups a day. Create a key in the [console](https://app.internetdata.io), then pass it in:
+
+```python
+import os
+
+client = InternetData(os.environ["INTERNETDATA_API_KEY"])
+
+result = client.lookup("146.70.116.130")
+print(result.is_vpn)              # True, on a paid plan
+print(result.vpn.provider)        # 'mullvad', on a paid plan
+print(result.location.city)       # 'Vienna', on a paid plan
+```
+
+### Async
+
+Everything above works the same way under asyncio, with `AsyncInternetData`:
+
+```python
+import asyncio
+from internetdata import AsyncInternetData
+
+async def main():
+    async with AsyncInternetData() as client:
+        result = await client.lookup("146.70.116.130")
+        print(result.asn.name)   # 'M247 Europe SRL'
+
+asyncio.run(main())
+```
+
+### Your own address
+
+```python
+result = client.my_ip()
+print(result.ip)   # the address we saw this call come from
+```
+
+Same answer `lookup` would give for that address, and the same cost against your allowance. It is deliberately not cached: which address you are is the whole question, and a machine that moves between networks would otherwise be told where it used to be.
+
+### Your plan and usage
+
+```python
+acct = client.my_entitlement()
+print(acct.plan.key)          # starter
+print(acct.usage.requests)    # 580
+print(acct.usage.window_end)  # when the allowance resets
+```
+
+Usage counts against the anniversary of your subscription on a paid plan, not the calendar month and not the billing period, and against the UTC day on the free plan; it is the same number a lookup is gated on. `hard_limit` is `None` on an uncapped plan, which is not the same as zero.
+
+Both are on the async client too: `await client.my_ip()` and `await client.my_entitlement()`.
+
+### Batch lookup
+
+Look up as many addresses as you like at once. Bogons and cached answers are handled locally, and everything else goes to the batch endpoint in chunks of up to 1000 addresses, in parallel. The batch endpoint needs a paid plan:
+
+```python
+results = client.lookup_batch(["146.70.116.130", "8.8.8.8", "1.1.1.1"])
+
+for ip, result in results.items():
+    if isinstance(result, Exception):
+        print(f"{ip}: {result}")
+        continue
+    print(f"{ip}: {result.is_vpn}")
+```
+
+Results are keyed by address, in the order you first listed each one, so duplicates in your list collapse into a single entry and one address failing never loses the rest: it carries its error as its value, with the status the API would have given that address on its own.
+
+How many chunks are in flight at once, how many times a failed chunk is retried and how long each request may take are configurable per call:
+
+```python
+results = client.lookup_batch(many_ips, concurrency=4, retries=4, timeout=30)
+```
+
+### Caching
+
+Answers are cached by default, so repeat lookups of the same address are free:
+
+```python
+client = InternetData()
+
+result = client.lookup("146.70.116.130")
+print(result.asn.name)    # API request
+
+result2 = client.lookup("146.70.116.130")
+print(result2.asn.name)   # no API request, result was cached
+```
+
+You can change the default cache variables (max size, TTL in seconds, etc) on initialization, or even disable it:
+
+```python
+client = InternetData(cache_max_size=50_000, cache_ttl=6 * 60 * 60)
+client_no_cache = InternetData(cache=False)
+```
+
+### Private and reserved addresses
+
+Private, loopback, link-local, documentation and multicast addresses (and their IPv6 equivalents, including the 6to4 and Teredo ranges) are in no database. The library answers them locally, so they cost no request and no quota:
+
+```python
+result = client.lookup("192.168.1.1")
+result.is_bogon   # True
+result.is_vpn     # False
+```
+
+The answer has the shape the API gives a bogon on a paid plan, whatever your plan, so don't read your plan off it. The check is available on the client, which is handy when your inputs are addresses anyway:
+
+```python
+client.is_bogon("10.0.0.1")   # True
+client.is_bogon("8.8.8.8")    # False
+```
+
+It is also importable on its own, if you want it without a client:
+
+```python
+from internetdata import is_bogon
+
+is_bogon("10.0.0.1")   # True
+```
+
+### AS and domain lookups
+
+```python
+asn = client.lookup_asn(9009)
+print(asn.name, asn.registry)    # M247 Europe SRL ripe
+
+domain = client.lookup_domain("example.com")
+print(domain.is_registered, domain.has_mx)   # True True
+```
+
+On a paid plan an AS answer also carries its Whois record, its counts and every prefix it announces, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch.
+
+### Errors
+
+Failures raise an `InternetDataError` carrying a `kind` and a `retryable` flag:
+
+```python
+from internetdata import InternetDataError
+
+try:
+    client.lookup("1.1.1.1")
+except InternetDataError as err:
+    print(err.kind, err.retryable, err.message)
+```
+
+`kind` is one of `bad_request`, `unauthorized`, `forbidden`, `rate_limited`, `quota_exceeded`, `server_error` or `network`. `message` is the API's own: a lookup's error message, or a database call's result code, passed through as it was sent, so you can switch on `NOT_LICENSED` against `LICENSE_EXPIRED` without reading the status.
+
+A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, or on a single `lookup`, `lookup_asn`, `lookup_domain`, `my_ip`, `my_entitlement`, `lookup_batch`, `oauth` or `database` call (transfers aside), in seconds:
+
+```python
+client = InternetData(timeout=10)
+result = client.lookup("146.70.116.130", timeout=2)
+```
+
+`None` means no bound on the client, and the client's own on a call. Anything else that is not a number greater than 0 raises `ValueError` where it is set, before any request is made.
+
+**Changed in 2.1.0:** the default was 10 seconds, and it bounded each read of a response rather than the whole attempt, so a response trickling in slowly could run past it for as long as the server kept sending.
+
+**Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
+
+Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit carries `Retry-After`, and retrying after it works: Unlimited's per-minute limit is one. A spent quota needs your allowance raised or the window to roll over. The library retries rate limits for you, but not a spent quota, and nothing else you sent either.
+
+### Database downloads
 
 Every database call needs an API key carrying the `db.download` scope. Create one in the console, then:
 
@@ -29,14 +214,7 @@ for family in client.database.list():
     print(family.base, family.standing, [v.id for v in family.versions])
 ```
 
-The client holds an HTTP connection pool, so use it as a context manager, or call `client.close()` when you are done with it:
-
-```python
-with InternetData(api_key) as client:
-    print(len(client.database.list()))
-```
-
-### The catalog
+#### The catalog
 
 `list` answers database FAMILIES. A license is held against a family, while a download names a specific version, so the IDs the other calls take come from each family's `versions`:
 
@@ -52,7 +230,7 @@ for family in client.database.list():
 
 A rolling license also carries `renews_at`, when it next renews, and `notice_due_at`, the last day you can give notice of non-renewal for that term. Both are `None` when there is no license, when it has no defined term, or when `expires` sets a hard stop instead. `DATABASE_FORMATS`, `STANDINGS` and `LICENSE_TYPES` hold the published values at runtime, for checking one that came from a flag or a form before you make a call.
 
-### What is inside a build
+#### What is inside a build
 
 `metadata` is cheap enough to poll. It answers when the build was generated, how many rows it has, its columns and a few real rows, and the size of each format in bytes, all without moving the file:
 
@@ -67,7 +245,7 @@ print([c.name for c in meta.schema["csvgz"]])
 
 Checking `size` before a download is worth the round trip: the catalog spans a few hundred bytes to several gigabytes.
 
-### Downloading
+#### Downloading
 
 Three ways, depending on what you want to do with the bytes:
 
@@ -100,7 +278,7 @@ digests = client.database.checksums("bogon_ip_v1", "csvgz")
 assert hashlib.sha256(raw).hexdigest() == digests["sha256"]
 ```
 
-### Download history
+#### Download history
 
 `downloads` answers your organization's recent attempts, newest first, refusals included. A denial is what answers "it stopped working", and its absence answers nothing:
 
@@ -109,52 +287,13 @@ for attempt in client.database.downloads(limit=20):
     print(attempt.created, attempt.dataset_id, attempt.outcome, attempt.http_status)
 ```
 
-### Async
-
-Everything above works the same way under asyncio, with `AsyncInternetData`:
+From 2.3.0, `list`, `metadata`, `checksums`, `downloads` and `download_url` each take a keyword-only `timeout` in seconds, bounding each attempt at that one call in place of the client's; `None` there means the client's own rather than no bound. `download` and `download_bytes` deliberately take none and raise `TypeError` if handed one, rather than accepting it and quietly doing nothing: a transfer runs to gigabytes and minutes, so any bound that suits a JSON call would abandon a healthy download. `download_url` does take one, because minting the link is an ordinary API request - it bounds that request, not whatever you do with the link afterwards:
 
 ```python
-import asyncio
-from internetdata import AsyncInternetData
-
-async def main():
-    async with AsyncInternetData(api_key) as client:
-        meta = await client.database.metadata("bogon_ip_v1")
-        await client.database.download("bogon_ip_v1", "csvgz", "./bogon_ip_v1.csv.gz")
-        print(meta.entries)
-
-asyncio.run(main())
-```
-
-### Errors
-
-Failures raise an `InternetDataError` carrying a `kind` and a `retryable` flag:
-
-```python
-from internetdata import InternetDataError
-
-try:
-    client.database.download_url("vpn_ip_v1", "mmdb")
-except InternetDataError as err:
-    print(err.kind, err.retryable, err.message)   # forbidden False NOT_LICENSED
-```
-
-`kind` is one of `bad_request`, `unauthorized`, `forbidden`, `rate_limited`, `quota_exceeded`, `server_error` or `network`. `message` is the API's own result code, passed through as it was sent, so you can switch on `NOT_LICENSED` against `LICENSE_EXPIRED` without reading the status.
-
-A request that runs past its `timeout` fails with `network`, and is retried like any other network failure. The default is 30 seconds per attempt, body included, so a retried call can take longer in total. A database transfer is exempt, so `download` and `download_bytes` are never cut off part way through a large file. Set it on the client, in seconds, or pass `None` for no bound. Anything else that is not a number greater than 0 raises `ValueError` where it is set:
-
-```python
-client = InternetData(api_key, timeout=10)
 catalog = client.database.list(timeout=2)
 ```
 
-From 2.3.0, `list`, `metadata`, `checksums`, `downloads` and `download_url` each take a keyword-only `timeout` in seconds, bounding each attempt at that one call in place of the client's; `None` there means the client's own rather than no bound. `download` and `download_bytes` deliberately take none and raise `TypeError` if handed one, rather than accepting it and quietly doing nothing: a transfer runs to gigabytes and minutes, so any bound that suits a JSON call would abandon a healthy download. `download_url` does take one, because minting the link is an ordinary API request - it bounds that request, not whatever you do with the link afterwards.
-
-**Changed in 2.1.0:** the default was 10 seconds, and it bounded each read of a response rather than the whole attempt, so a response trickling in slowly could run past it for as long as the server kept sending.
-
-**Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
-
-`rate_limited` is a 429 that carries `Retry-After`, and the library retries it for you, as it does server and network failures. `quota_exceeded` is a 429 without one, which it never retries, and it retries nothing else you sent either. InternetData's database API has no quota, so you won't see `quota_exceeded` from it.
+InternetData's database API has no quota, so you won't see `quota_exceeded` from it.
 
 ### Sign in with OAuth (device flow)
 
@@ -210,13 +349,24 @@ registration = client.oauth.register(
 
 Each redirect URI must be https on a public host name, or http on a loopback address, which then matches any port. Nothing is kept until a person approves the client, so an app with no client ID saved can simply register again.
 
+### Fields your plan does not include
+
+Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's, the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its daily trial is spent. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
+
+```python
+result.flagged("is_hosting")   # False rather than None on a plan without it
+result.is_hosting is None      # True on Unlimited: not in your plan
+result.location.city is None   # True on Unlimited
+result.trial_expired is True   # a free-plan key's daily trial is spent
+```
+
 ## Other Libraries
 
 There are official InternetData client libraries available for many languages including PHP, Python, Go, Java, and Ruby. See our GitHub at https://github.com/internetdata for more.
 
 ## About InternetData
 
-Geolocation, anonymity, ownership and network databases for IP addresses and AS numbers, licensed as files you download and query yourself.
+Geolocation, anonymity, ownership and network data for IP addresses, AS numbers and domains, through an API or as database files you download and query yourself.
 
 [<img src="https://s3.internetdata.io/internetdata-public/brand/mark.svg" alt="InternetData" height="64"/>](https://internetdata.io/)
 

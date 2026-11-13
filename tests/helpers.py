@@ -9,6 +9,7 @@ client would leave half of this library unchecked.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import socket
 import threading
@@ -20,7 +21,7 @@ from typing import Any, NoReturn, Self
 import httpx
 import pytest
 
-from internetdata import AsyncInternetData, InternetData
+from internetdata import AsyncInternetData, InternetData, Result
 from internetdata._core import AsyncClock, Clock
 
 TESTDATA: dict[str, Any] = json.loads(
@@ -38,7 +39,12 @@ DOWNLOADS_PATH = "/api/v2/database/downloads"
 
 
 class ClientFactory:
-    """Builds clients of one flavor and closes every one of them afterwards."""
+    """Builds clients of one flavor and closes every one of them afterwards.
+
+    Carries `kind` because a test double sometimes has to know which flavor it is about
+    to serve: a handler that blocks a thread is right for the sync client and wrong for
+    the async one, where it would serialize the very thing under test.
+    """
 
     def __init__(self, kind: str) -> None:
         self.kind = kind
@@ -71,6 +77,33 @@ class ClientAdapter:
         )
         self.database = DatabaseAdapter(self.client)
         self.oauth = OauthAdapter(self.client)
+
+    def is_bogon(self, ip: str) -> bool:
+        return self.client.is_bogon(ip)
+
+    def lookup(self, ip: str, **kwargs: Any) -> Result:
+        return self._call("lookup", ip, **kwargs)  # type: ignore[no-any-return]
+
+    def lookup_asn(self, asn: Any, **kwargs: Any) -> Any:
+        return self._call("lookup_asn", asn, **kwargs)
+
+    def lookup_domain(self, domain: str, **kwargs: Any) -> Any:
+        return self._call("lookup_domain", domain, **kwargs)
+
+    def my_ip(self, **kwargs: Any) -> Result:
+        return self._call("my_ip", **kwargs)  # type: ignore[no-any-return]
+
+    def my_entitlement(self, **kwargs: Any) -> Any:
+        return self._call("my_entitlement", **kwargs)
+
+    def lookup_batch(self, ips: Any, **kwargs: Any) -> dict[str, Any]:
+        return self._call("lookup_batch", ips, **kwargs)  # type: ignore[no-any-return]
+
+    def _call(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        method = getattr(self.client, name)
+        if isinstance(self.client, InternetData):
+            return method(*args, **kwargs)
+        return asyncio.run(method(*args, **kwargs))
 
     def close(self) -> None:
         if isinstance(self.client, InternetData):
@@ -330,6 +363,118 @@ class Stub:
             return route["body"]
         bodies = route["bodies"]
         return bodies[min(self._served(self.requests[-1].url.path) - 1, len(bodies) - 1)]
+
+
+class Lookups:
+    """A transport that answers lookups from a table keyed by address, and records what it
+    was asked for, so "never touched the network" is asserted rather than assumed."""
+
+    def __init__(self, routes: dict[str, dict[str, Any]]) -> None:
+        self.routes = routes
+        self.calls: list[str] = []
+        self.transport = httpx.MockTransport(self._handle)
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
+        self.calls.append(f"{request.method} {request.url}")
+        if request.url.path == "/batch":
+            return self._batch(request)
+        ip = _ip_of(request)
+        route = self.routes.get(ip)
+        if route is None:
+            return httpx.Response(400, json={"error": "not a valid IP address"})
+        return httpx.Response(
+            route.get("status", 200), json=route["body"], headers=route.get("headers")
+        )
+
+    # A POST /batch is answered the way the API answers one: every address the table
+    # knows is a result if its route is a 200 and an entry error otherwise, and an
+    # unknown address is the 400 the API gives a string that is not one.
+    def _batch(self, request: httpx.Request) -> httpx.Response:
+        results: dict[str, Any] = {}
+        errors: dict[str, Any] = {}
+        for ip in json.loads(request.content or b"{}").get("ips", []):
+            route = self.routes.get(ip)
+            if route is None:
+                errors[ip] = {"status": 400, "error": "not a valid IP address"}
+            elif route.get("status", 200) == 200:
+                results[ip] = route["body"]
+            else:
+                errors[ip] = {"status": route["status"], "error": route["body"].get("error")}
+        return httpx.Response(200, json={"results": results, "errors": errors})
+
+
+class Meter:
+    """A transport that answers slowly enough for concurrent calls to overlap, and
+    records the peak number in flight.
+
+    Asserting the PEAK is the only way to tell a real limit from an option that was
+    accepted and ignored. The sync client drives this from a thread pool, so the counters
+    need a lock; the async one drives it from one event loop, where they do not.
+    """
+
+    def __init__(self, kind: str, delay: float = 0.02) -> None:
+        self.in_flight = 0
+        self.peak = 0
+        self.calls = 0
+        self._lock = threading.Lock()
+        handler = self._handle_sync if kind == "sync" else self._handle_async
+        self.transport = httpx.MockTransport(handler)
+        self._delay = delay
+
+    def _handle_sync(self, request: httpx.Request) -> httpx.Response:
+        self._enter()
+        time.sleep(self._delay)
+        return self._leave(request)
+
+    async def _handle_async(self, request: httpx.Request) -> httpx.Response:
+        self._enter()
+        await asyncio.sleep(self._delay)
+        return self._leave(request)
+
+    def _enter(self) -> None:
+        with self._lock:
+            self.calls += 1
+            self.in_flight += 1
+            self.peak = max(self.peak, self.in_flight)
+
+    def _leave(self, request: httpx.Request) -> httpx.Response:
+        with self._lock:
+            self.in_flight -= 1
+        # A batch arrives as one POST per chunk, so it is answered from the addresses in
+        # the body rather than from the path.
+        if request.url.path == "/batch":
+            ips = json.loads(request.content or b"{}").get("ips", [])
+            return httpx.Response(
+                200, json={"results": {ip: answer(ip) for ip in ips}, "errors": {}}
+            )
+        return httpx.Response(200, json=answer(_ip_of(request)))
+
+
+def answer(ip: str, /, **members: Any) -> dict[str, Any]:
+    """The smallest answer the API serves for `ip`: Unlimited's shape, with `members` laid
+    over it."""
+    unlimited = TESTDATA["lookup"][0]["body"]
+    return {**unlimited, "ip": ip, **members}
+
+
+def as_wire(value: Any) -> Any:
+    """A lookup answer, or any part of it, back in the shape the API serves it: every member
+    this library read as None left out, and a tuple as a list. `raw` is not part of it."""
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return {
+            member.name: as_wire(getattr(value, member.name))
+            for member in dataclasses.fields(value)
+            if member.name != "raw" and getattr(value, member.name) is not None
+        }
+    if isinstance(value, tuple):
+        return [as_wire(item) for item in value]
+    if isinstance(value, dict):
+        return {key: as_wire(item) for key, item in value.items()}
+    return value
+
+
+def _ip_of(request: httpx.Request) -> str:
+    return request.url.path.lstrip("/")
 
 
 class LocalServer:

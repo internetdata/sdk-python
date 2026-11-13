@@ -7,6 +7,9 @@ disagreeing about the same response.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import pytest
 from helpers import (
     API_KEY,
@@ -14,12 +17,24 @@ from helpers import (
     LIST_PATH,
     METADATA_PATH,
     TESTDATA,
+    ClientAdapter,
     ClientFactory,
+    Lookups,
     Stub,
+    answer,
+    as_wire,
     database,
 )
 
-from internetdata import DATABASE_FORMATS, LICENSE_TYPES, STANDINGS, InternetDataError
+from internetdata import (
+    DATABASE_FORMATS,
+    DEFAULT_BASE_URL,
+    LICENSE_TYPES,
+    STANDINGS,
+    InternetDataError,
+    Result,
+    is_bogon,
+)
 
 # One live grant, one that has run out, and one never bought. Between them these cover
 # every value the corpus pins for `standing` and `license_type`.
@@ -35,18 +50,22 @@ CATALOG = [
 ]
 
 
+# A lookup refusal carries its message in `error` and a database refusal in `rc`; each is
+# read whichever call it answers, so every case runs against both.
+ERROR_CALLS: dict[str, tuple[str, Callable[[ClientAdapter], Any]]] = {
+    "lookup": ("/1.1.1.1", lambda client: client.lookup("1.1.1.1")),
+    "database": (LIST_PATH, lambda client: client.database.list()),
+}
+
+
+@pytest.mark.parametrize("call", ERROR_CALLS)
 def test_every_error_shape_maps_to_the_same_kind_in_every_language(
-    make_client: ClientFactory,
+    make_client: ClientFactory, call: str
 ) -> None:
+    path, send = ERROR_CALLS[call]
     for case in TESTDATA["errors"]:
         stub = Stub(
-            {
-                LIST_PATH: {
-                    "status": case["status"],
-                    "body": case["body"],
-                    "headers": case["headers"],
-                }
-            }
+            {path: {"status": case["status"], "body": case["body"], "headers": case["headers"]}}
         )
         # No retries, so a retryable error still surfaces rather than looping.
         client = make_client(transport=stub.transport, retries=0)
@@ -54,13 +73,14 @@ def test_every_error_shape_maps_to_the_same_kind_in_every_language(
         expect = case["expect"]
 
         with pytest.raises(InternetDataError) as caught:
-            client.database.list()
+            send(client)
 
         err = caught.value
         assert err.kind == expect["kind"], name
         assert err.retryable is expect["retryable"], f"{name}: retryable"
         assert err.status == case["status"], f"{name}: status"
-        assert str(err) == expect["message"], f"{name}: message"
+        if "message" in expect:
+            assert str(err) == expect["message"], f"{name}: message"
         if "retryAfterSeconds" in expect:
             assert err.retry_after_seconds == expect["retryAfterSeconds"], name
 
@@ -69,24 +89,23 @@ def test_every_error_shape_maps_to_the_same_kind_in_every_language(
 # is the CALLER's, and classifying by an enumerated list lets the rest (the corpus's 422)
 # fall through to a retryable server_error. Asserted with retries ON and by counting
 # requests: with retries off, one request is guaranteed and a wrong classifier passes.
-def test_no_client_error_is_ever_retried(make_client: ClientFactory) -> None:
+@pytest.mark.parametrize("call", ["lookup", "database"])
+def test_no_client_error_is_ever_retried(make_client: ClientFactory, call: str) -> None:
     cases = [case for case in TESTDATA["errors"] if not case["expect"]["retryable"]]
     assert any(case["name"] == "unlisted-4xx-is-not-retryable" for case in cases)
+    path = "/1.1.1.1" if call == "lookup" else METADATA_PATH
 
     for case in cases:
         stub = Stub(
-            {
-                METADATA_PATH: {
-                    "status": case["status"],
-                    "body": case["body"],
-                    "headers": case["headers"],
-                }
-            }
+            {path: {"status": case["status"], "body": case["body"], "headers": case["headers"]}}
         )
         client = make_client(transport=stub.transport, retries=3)
 
         with pytest.raises(InternetDataError) as caught:
-            client.database.metadata("nope_v1")
+            if call == "lookup":
+                client.lookup("1.1.1.1")
+            else:
+                client.database.metadata("nope_v1")
 
         # The count first: a retried case also ends on an error, just a later one.
         assert len(stub.requests) == 1, f"{case['name']}: issued {len(stub.requests)} requests"
@@ -111,6 +130,216 @@ def test_the_two_429s_differ_only_by_retry_after(make_client: ClientFactory) -> 
         assert len(stub.requests) == expected_requests, (
             f"{kind}: made {len(stub.requests)} requests, expected {expected_requests}"
         )
+
+
+def test_is_bogon_matches_the_canonical_ranges() -> None:
+    for case in TESTDATA["isBogon"]:
+        assert is_bogon(case["ip"]) is case["expect"], f"{case['ip']} ({case['why']})"
+
+
+# A server listening on :: sees an IPv4 visitor as ::ffff:a.b.c.d, which read whole is
+# inside ::ffff:0:0/96: an SDK that does not unmap answers every such visitor as a bogon.
+def test_an_ipv4_mapped_address_is_the_ipv4_address_it_carries(
+    make_client: ClientFactory,
+) -> None:
+    for case in TESTDATA["ipv4Mapped"]:
+        ip, carries, bogon = case["ip"], case["carries"], case["expect"]
+        assert is_bogon(ip) is bogon, f"{ip} ({case['why']})"
+        routes = {carries: {"body": answer(carries)}}
+
+        stub = Lookups(routes)
+        client = make_client(transport=stub.transport)
+        result = client.lookup(ip)
+        assert result.is_bogon is bogon, ip
+        assert result.ip == carries, ip
+        client.lookup(carries)
+        assert len(stub.calls) == (0 if bogon else 1), f"{ip}: one request, cached as {carries}"
+
+        # The stub knows only the carried address, so the mapped form alone answers only
+        # if the carried one was sent.
+        batch_stub = Lookups(routes)
+        uncached = make_client(transport=batch_stub.transport, cache=False)
+        alone = uncached.lookup_batch([ip])
+        assert list(alone) == [ip], ip
+        found = alone[ip]
+        assert isinstance(found, Result) and found.ip == carries, f"{ip}: {found!r}"
+        asked = list(dict.fromkeys([ip, carries]))
+        both = uncached.lookup_batch(asked)
+        assert list(both) == asked, ip
+        assert len(batch_stub.calls) == (0 if bogon else 2), ip
+
+
+def test_a_bogon_is_answered_locally_in_the_full_paid_shape(make_client: ClientFactory) -> None:
+    stub = Lookups({})
+    client = make_client(transport=stub.transport)
+    result = client.lookup("10.0.0.1")
+    shape = TESTDATA["bogonResponse"]
+
+    assert result.is_bogon is True
+    assert result.ip == "10.0.0.1"
+    for flag in shape["flagsFalse"]:
+        assert getattr(result, flag) is False, f"{flag} must be present and false"
+    for name in shape["emptyObjects"]:
+        detail = getattr(result, name)
+        assert detail is not None and as_wire(detail) == {}, f"{name} must be present and empty"
+    for name in shape["emptyLists"]:
+        assert getattr(result, name) == (), f"{name} must be present and empty"
+    for name in ("location", "asn", "company", "abuse", "whois", "rwhois"):
+        assert as_wire(getattr(result, name)) == shape[name], f"{name} must carry every key, empty"
+    assert result.hostname == shape["hostname"]
+    assert as_wire(result.hosted_domains) == shape["hostedDomains"]
+    assert as_wire(result) == {**shape["answer"], "ip": "10.0.0.1"}
+    assert stub.calls == [], "a bogon must not reach the network"
+
+
+LOOKUP_CALLS: dict[str, tuple[Callable[[Any], str], str]] = {
+    "lookup": (lambda target: f"/{target}", "lookup"),
+    "lookupAsn": (lambda target: f"/asn/{target}", "lookup_asn"),
+    "lookupDomain": (lambda target: f"/domain/{target}", "lookup_domain"),
+}
+
+
+@pytest.mark.parametrize("case", TESTDATA["lookup"], ids=lambda case: case["name"])
+def test_a_lookup_preserves_absent_versus_false_across_every_plan_shape(
+    make_client: ClientFactory, case: dict[str, Any]
+) -> None:
+    path, method = LOOKUP_CALLS[case["call"]]
+    body = case["body"]
+    stub = Stub({path(case["target"]): {"status": case["status"], "body": body}})
+    client = make_client(transport=stub.transport)
+    expect = case["expect"]
+
+    result = getattr(client, method)(case["target"])
+
+    assert result.raw == body, "raw must be the wire object"
+    for key, value in expect["present"].items():
+        assert as_wire(getattr(result, key)) == value, f"{key} should be {value!r}"
+        if isinstance(value, bool):
+            assert getattr(result, key) is value, f"{key} must be a bool"
+    for key in expect["objects"]:
+        assert as_wire(getattr(result, key)) == body[key], f"{key} must read as served"
+    for key in expect["empty"]:
+        assert as_wire(getattr(result, key)) in ({}, []), f"{key} must be present and empty"
+    for key in expect["absent"]:
+        assert getattr(result, key) is None, f"{key} must be ABSENT, not false"
+        if key.startswith("is_") and isinstance(result, Result):
+            assert result.flagged(key) is False, f"{key} must coalesce to false"
+    for name, members in expect.get("absentIn", {}).items():
+        for member in members:
+            assert getattr(getattr(result, name), member) is None, f"{name}.{member} must be ABSENT"
+    assert as_wire(result) == body, "every member must read back as served"
+
+
+def test_batch_dedupes_short_circuits_bogons_and_keys_by_address(
+    make_client: ClientFactory,
+) -> None:
+    case = _batch_case("dedup-bogon-and-order-free-keying")
+    stub = Lookups({ip: {"body": answer(ip)} for ip in case["input"]})
+    client = make_client(transport=stub.transport)
+
+    out = client.lookup_batch(case["input"])
+
+    assert list(out) == case["expect"]["keys"], "keys follow first-seen order"
+    assert len(stub.calls) == case["expect"]["httpRequests"]
+    assert stub.calls[0].startswith("POST "), "a batch is one POST, not a request per address"
+    for ip in case["expect"]["bogonKeys"]:
+        found = out[ip]
+        assert isinstance(found, Result) and found.is_bogon, ip
+
+
+def test_one_bad_address_does_not_lose_the_rest_of_the_batch(make_client: ClientFactory) -> None:
+    case = _batch_case("partial-failure-does-not-fail-the-batch")
+    stub = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+    client = make_client(transport=stub.transport)
+
+    out = client.lookup_batch(case["input"])
+
+    assert list(out) == case["expect"]["keys"]
+    for ip in case["expect"]["errorKeys"]:
+        err = out[ip]
+        assert isinstance(err, InternetDataError), ip
+        assert err.kind == case["expect"]["errorKinds"][ip]
+    assert isinstance(out["1.1.1.1"], Result)
+
+
+def test_a_cache_hit_issues_no_second_request(make_client: ClientFactory) -> None:
+    case = _batch_case("cache-hit-issues-no-second-request")
+    stub = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+    client = make_client(transport=stub.transport)
+
+    for _ in range(case["repeat"]):
+        out = client.lookup_batch(case["input"])
+
+    assert list(out) == case["expect"]["keys"]
+    assert len(stub.calls) == case["expect"]["httpRequests"]
+
+
+@pytest.mark.parametrize("name", ["chunks-of-one-thousand", "uncapped-input-is-chunked"])
+def test_a_large_batch_is_sent_in_chunks_of_a_thousand(
+    make_client: ClientFactory, name: str
+) -> None:
+    case = _batch_case(name)
+    stub = Lookups({ip: {"body": answer(ip)} for ip in case["input"]})
+    client = make_client(transport=stub.transport)
+
+    out = client.lookup_batch(case["input"])
+
+    assert len(stub.calls) == case["expect"]["httpRequests"], "one POST per chunk of 1000"
+    assert list(out) == case["input"], "every address answered exactly once"
+    assert all(isinstance(result, Result) for result in out.values())
+
+
+def test_an_entry_error_is_classified_by_its_status(make_client: ClientFactory) -> None:
+    case = _batch_case("an-entry-error-is-classified-by-its-status")
+    stub = Lookups(
+        {
+            "1.1.1.1": {"body": answer("1.1.1.1")},
+            "8.8.8.8": {"status": 429, "body": {"error": "monthly quota exceeded"}},
+            "9.9.9.9": {"status": 500, "body": {"error": "lookup failed"}},
+        }
+    )
+    client = make_client(transport=stub.transport, retries=2)
+
+    out = client.lookup_batch(case["input"])
+
+    assert list(out) == case["expect"]["keys"]
+    assert len(stub.calls) == case["expect"]["httpRequests"], "an entry error is never retried"
+    for ip, kind in case["expect"]["errorKinds"].items():
+        err = out[ip]
+        assert isinstance(err, InternetDataError), ip
+        assert err.kind == kind, ip
+    assert isinstance(out["1.1.1.1"], Result)
+
+
+def test_two_clients_never_share_a_cached_answer(make_client: ClientFactory) -> None:
+    first = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+    second = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+
+    make_client(transport=first.transport).lookup("1.1.1.1")
+    make_client(transport=second.transport).lookup("1.1.1.1")
+
+    assert len(first.calls) == 1
+    assert len(second.calls) == 1, "a second client must not read the first one's cache"
+
+
+def test_caching_can_be_turned_off(make_client: ClientFactory) -> None:
+    stub = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+    client = make_client(transport=stub.transport, cache=False)
+
+    client.lookup("1.1.1.1")
+    client.lookup("1.1.1.1")
+
+    assert len(stub.calls) == 2
+
+
+def test_the_default_base_url_is_the_api_host() -> None:
+    assert DEFAULT_BASE_URL == "https://api.internetdata.io"
+
+
+def _batch_case(name: str) -> dict[str, Any]:
+    (case,) = [case for case in TESTDATA["batch"] if case["name"] == name]
+    found: dict[str, Any] = case
+    return found
 
 
 def test_the_catalog_carries_every_standing_and_license_type_the_corpus_pins(

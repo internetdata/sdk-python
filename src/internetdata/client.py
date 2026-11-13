@@ -5,14 +5,19 @@ from __future__ import annotations
 import builtins
 import os
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from types import TracebackType
 from typing import Any, Self, TypeVar
 
 import httpx
 
 from ._core import (
+    BATCH_MAX,
     DEFAULT_BASE_URL,
+    DEFAULT_CACHE_MAX_SIZE,
+    DEFAULT_CACHE_TTL,
+    DEFAULT_CONCURRENCY,
     DEFAULT_DOWNLOADS_LIMIT,
     DEFAULT_RETRIES,
     DEFAULT_TIMEOUT,
@@ -24,19 +29,30 @@ from ._core import (
     OAUTH_TOKEN_PATH,
     POLL_DEADLINE_CAP,
     TRANSFER_CHUNK_BYTES,
+    Abandoned,
+    Cache,
     Clock,
+    Flights,
     as_error,
     assert_whole_transfer,
     authorization_url,
+    batch_answers,
+    batch_body,
     build_client,
     build_transfer_client,
+    call_retries,
     check_build,
+    check_client_concurrency,
+    check_concurrency,
     check_retries,
     check_timeout,
     checksums_of,
+    chunked,
     create_pkce,
     databases_of,
     downloads_of,
+    landed_error,
+    oauth_base,
     oauth_body,
     oauth_request,
     parse_body,
@@ -55,23 +71,35 @@ from ._generated.api.database_v_2 import (
     list_databases,
     list_downloads,
 )
+from ._generated.api.entitlement import my_entitlement
+from ._generated.api.lookup import lookup_asn, lookup_batch, lookup_domain, lookup_ip, lookup_my_ip
 from ._generated.client import AuthenticatedClient
+from ._generated.models.batch_lookup_request import BatchLookupRequest
 from ._generated.models.database_format import DatabaseFormat
+from .bogon import bogon_result, is_bogon, unmapped
 from .errors import InternetDataError, OauthError, OauthExpiredTokenError
 from .models import (
+    AsnResult,
     ClientRegistration,
     Database,
     DatabaseMetadata,
     DeviceAuthorization,
+    DomainResult,
     Download,
+    Entitlement,
     Format,
     OauthMetadata,
     Pkce,
+    Result,
     TokenResponse,
+    to_asn_result,
     to_client_registration,
     to_device_authorization,
+    to_domain_result,
+    to_entitlement,
     to_metadata,
     to_oauth_metadata,
+    to_result,
     to_token_response,
 )
 
@@ -83,22 +111,29 @@ T = TypeVar("T")
 class InternetData:
     """A client for the InternetData API.
 
-    Every database published today is licensed, so create a key carrying the
-    `db.download` scope in the console and pass it in. The argument is optional
-    nonetheless, and an absent or empty one sends no `Authorization` header at all
-    rather than an empty one: what this API serves without a license is a product
-    decision, not the client's to refuse. `oauth` needs no key at all.
+    No API key is needed to start: without one a lookup is on Unlimited, the free plan,
+    limited per address per minute. A batch needs a paid plan, and the databases a key
+    carrying the `db.download` scope. An absent or empty key sends no `Authorization`
+    header at all rather than an empty one, and `oauth` needs no key at all.
+
+    The cache is per instance, so an answer is never shared between two clients holding
+    different API keys and therefore entitled to different fields.
 
     `timeout` is how long one attempt at a request may take, in seconds, body included, so a
     call that is retried can take longer in total; None means no bound, and a database
-    transfer is exempt. Every `oauth` request and every `database` call but the two
-    transfers also takes `timeout`, which overrides the client's for that call alone.
-    Anything else that is not a finite number greater than 0 is a `ValueError` where it is
-    set, rather than a failure of every call.
+    transfer is exempt. `lookup`, `lookup_asn`, `lookup_domain`, `my_ip`, `my_entitlement`
+    and `lookup_batch` also take `retries` and `timeout`, and every `oauth` request and every
+    `database` call but the two transfers takes `timeout`, which override the client's for
+    that call alone. Any other `timeout` that is not a finite number greater than 0 is a
+    `ValueError` where it is set, rather than a failure of every request.
 
     `retries` is how many times a failed attempt is retried, 2 unless given: a whole number
-    from 0, or `math.inf` to retry until the call succeeds. Anything else is a `ValueError`
-    here too.
+    from 0, or `math.inf` to retry until the call succeeds. Anything else, on the client or
+    a call, is a `ValueError` where it is set too.
+
+    `concurrency` is how many chunks of a batch are in flight at once, 8 unless given: a
+    whole number of at least 1. Anything else is a `ValueError` here, and a `bad_request`
+    from `lookup_batch` when a call sets it.
 
     Holds an HTTP connection pool, so use it as a context manager or call `close()` when
     you are done with it.
@@ -115,18 +150,270 @@ class InternetData:
         api_key: str | None = None,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        retries: int = DEFAULT_RETRIES,
+        cache: bool = True,
+        cache_max_size: int = DEFAULT_CACHE_MAX_SIZE,
+        cache_ttl: float = DEFAULT_CACHE_TTL,
+        concurrency: int = DEFAULT_CONCURRENCY,
+        retries: float = DEFAULT_RETRIES,
         timeout: float | None = DEFAULT_TIMEOUT,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         timeout = check_timeout(timeout)
+        concurrency = check_client_concurrency(concurrency)
         self._client = build_client(api_key, base_url, timeout, transport)
         self._base_url = base_url
+        self._oauth_base = oauth_base(base_url)
         self._transfer = build_transfer_client(timeout, transport)
+        self._cache = Cache(cache_max_size, cache_ttl) if cache else None
+        # Only a client that caches shares a request: without a cache every lookup is
+        # served, as `cache=False` promises.
+        self._flights = Flights(Future)
+        self._concurrency = concurrency
         self._retries = check_retries(retries)
         self._timeout = timeout
         self.database = DatabaseApi(self)
         self.oauth = OauthApi(self)
+
+    def is_bogon(self, ip: str) -> bool:
+        """Whether an address is private, loopback, link-local, documentation, multicast
+        or otherwise not routable, including the IPv6 equivalents and the 6to4 and
+        Teredo ranges.
+
+        These are the addresses `lookup` answers locally. Exposed here so the check is
+        reachable from the client you already hold; the same function is also importable
+        on its own.
+        """
+        return is_bogon(ip)
+
+    def lookup(
+        self, ip: str, *, retries: float | None = None, timeout: float | None = None
+    ) -> Result:
+        """What every database says about one address.
+
+        A bogon is answered locally and never reaches the network. Everything else is
+        served, then cached for this instance. Calls that miss the cache while a request
+        for their address is in flight, a batch's included, await that request rather than
+        sending their own, and take its answer, sent under the options of the call that led
+        it.
+        """
+        # Here as well as in _bound: a bogon or a cached answer returns before any request.
+        check_timeout(timeout)
+        call_retries(retries)
+        ip = unmapped(ip)
+        if is_bogon(ip):
+            return bogon_result(ip)
+        if self._cache is None:
+            return self._serve(ip, retries, timeout)
+        while True:
+            hit = self._cache.get(ip)
+            if hit is not None:
+                return hit
+            led, joined = self._flights.board([ip])
+            if ip in led:
+                return self._lead(ip, led[ip], retries, timeout)
+            try:
+                result: Result = joined[ip].result()
+                return result
+            except InternetDataError as err:
+                raise landed_error(err) from None
+            except Abandoned:
+                continue
+
+    def _lead(self, ip: str, flight: Any, retries: float | None, timeout: float | None) -> Result:
+        assert self._cache is not None
+        try:
+            # A request that landed between the miss and boarding cached its answer before
+            # it left the board, so it is found here.
+            result = self._cache.get(ip)
+            if result is None:
+                result = self._serve(ip, retries, timeout)
+        except InternetDataError as err:
+            self._flights.land(ip, flight, err)
+            raise
+        except BaseException:
+            self._flights.land(ip, flight, Abandoned())
+            raise
+        self._cache.put(ip, result)
+        self._flights.land(ip, flight, result)
+        return result
+
+    def _serve(self, ip: str, retries: float | None, timeout: float | None) -> Result:
+        def call() -> Result:
+            res = request(lookup_ip, self._client, self._bound(timeout), decode=False, ip=ip)
+            return parse_body(res, to_result)
+
+        return self._retrying(call, self._retries if retries is None else retries)
+
+    def lookup_asn(
+        self, asn: int, *, retries: float | None = None, timeout: float | None = None
+    ) -> AsnResult:
+        """What every database says about one autonomous system, by its number.
+
+        Sent as given, and refused by the API as `bad_request` when it cannot read it. Not
+        cached: the cache holds addresses.
+        """
+        call_retries(retries)
+
+        def call() -> AsnResult:
+            res = request(lookup_asn, self._client, self._bound(timeout), decode=False, asn=asn)
+            return parse_body(res, to_asn_result)
+
+        return self._retrying(call, self._retries if retries is None else retries)
+
+    def lookup_domain(
+        self, domain: str, *, retries: float | None = None, timeout: float | None = None
+    ) -> DomainResult:
+        """What every database says about one domain.
+
+        Sent as given, and refused by the API as `bad_request` when it cannot read it; an
+        internationalized name is answered under its punycode spelling. Not cached: the
+        cache holds addresses.
+        """
+        call_retries(retries)
+
+        def call() -> DomainResult:
+            res = request(
+                lookup_domain, self._client, self._bound(timeout), decode=False, domain=domain
+            )
+            return parse_body(res, to_domain_result)
+
+        return self._retrying(call, self._retries if retries is None else retries)
+
+    def my_ip(self, *, retries: float | None = None, timeout: float | None = None) -> Result:
+        """What every database says about the address this client is calling from.
+
+        The same answer `lookup` would give for that address, at the same cost against
+        your allowance. The address is the one our edge observed, so a call made through
+        a proxy or a VPN reports the exit it left through - usually the point of asking.
+
+        Deliberately NOT cached. The cache is keyed by address, and which address this
+        is IS the question: a machine that moves between networks would otherwise be
+        told where it used to be.
+        """
+
+        call_retries(retries)
+
+        def call() -> Result:
+            res = request(lookup_my_ip, self._client, self._bound(timeout), decode=False)
+            return parse_body(res, to_result)
+
+        return self._retrying(call, self._retries if retries is None else retries)
+
+    def my_entitlement(
+        self, *, retries: float | None = None, timeout: float | None = None
+    ) -> Entitlement:
+        """What this client's key is entitled to, and how much of it has been used.
+
+        Named for what it answers rather than `me`, which sits one letter from `my_ip`
+        and means something quite different: one is which address you are calling FROM,
+        the other is what the key you are calling WITH may spend.
+
+        Unlike a lookup there is no useful unauthenticated answer, so a client built
+        without a key gets an unauthorized error rather than a partial one.
+
+        Usage counts against the ALLOWANCE WINDOW - on a paid plan the anniversary of
+        the subscription, not the calendar month and not the billing period, and on the
+        free plan the UTC day - and it is the same number a lookup is gated on. It can
+        lag by a few seconds, because requests are counted in memory and flushed in
+        aggregate.
+
+        Deliberately NOT cached: the whole point is what has been spent, and a cached
+        answer is a wrong one within seconds of the next request.
+        """
+
+        call_retries(retries)
+
+        def call() -> Entitlement:
+            res = request(my_entitlement, self._client, self._bound(timeout), decode=False)
+            return parse_body(res, to_entitlement)
+
+        return self._retrying(call, self._retries if retries is None else retries)
+
+    def lookup_batch(
+        self,
+        ips: Iterable[str],
+        *,
+        concurrency: int | None = None,
+        retries: float | None = None,
+        timeout: float | None = None,
+    ) -> dict[str, Result | InternetDataError]:
+        """Look many addresses up in as few requests as possible.
+
+        Bogons are answered locally and cached answers are reused, and an address with a
+        request already in flight, a lookup's or another batch's, awaits that request;
+        everything else goes to the batch endpoint in chunks of up to 1000 addresses, with
+        at most `concurrency` chunks in flight, and a lookup arriving meanwhile awaits this
+        batch's answer for its address. Keyed by address rather than positional, so
+        duplicates in the input collapse to a single entry and the caller never has to
+        line two lists up. An address that fails carries its error as its value, so one
+        bad entry cannot lose the rest of the answers: the API reports a per-entry
+        failure with the status the single lookup would have answered, and a chunk that
+        fails as a whole marks every address in it. The batch endpoint needs a paid plan:
+        without a key every address in a request of two or more carries an
+        `unauthorized` error, and a free-plan key's request of two or more a
+        `bad_request` (HTTP 402). A request of one address is answered as its lookup
+        would be.
+
+        Each batch gets its own thread pool sized for THIS call, so a per-call
+        concurrency really is the ceiling rather than being silently capped by the
+        client's. A per-call `concurrency` below 1 is refused as `bad_request` before
+        anything is sent.
+        """
+        check_concurrency(concurrency)
+        check_timeout(timeout)
+        call_retries(retries)
+        asked = list(dict.fromkeys(ips))
+        unique = list(dict.fromkeys(unmapped(ip) for ip in asked))
+        answers: dict[str, Result | InternetDataError] = {}
+        pending: list[str] = []
+        for ip in unique:
+            if is_bogon(ip):
+                answers[ip] = bogon_result(ip)
+                continue
+            hit = self._cache.get(ip) if self._cache is not None else None
+            if hit is not None:
+                answers[ip] = hit
+                continue
+            pending.append(ip)
+        # Each address with a request in flight awaits it, and the rest are boarded before
+        # any chunk is built. A request that landed since the cache was read cached its
+        # answer first, so a led address is looked up there once more before it is sent.
+        led, joined = self._flights.board(pending) if self._cache is not None else ({}, {})
+        send: list[str] = []
+        for ip in pending:
+            if ip in joined:
+                continue
+            hit = self._cache.get(ip) if ip in led and self._cache is not None else None
+            if hit is not None:
+                self._flights.land(ip, led[ip], hit)
+                answers[ip] = hit
+                continue
+            send.append(ip)
+        try:
+            if send:
+                workers = self._concurrency if concurrency is None else concurrency
+                with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+                    futures = [
+                        pool.submit(self._lookup_chunk, chunk, retries, timeout, led)
+                        for chunk in chunked(send, BATCH_MAX)
+                    ]
+                for future in futures:
+                    answers.update(future.result())
+        finally:
+            for ip, flight in led.items():
+                self._flights.land(ip, flight, Abandoned())
+        for ip, flight in joined.items():
+            try:
+                answers[ip] = flight.result()
+            except InternetDataError as err:
+                answers[ip] = landed_error(err)
+            except Abandoned:
+                # Its leader stopped before the answer landed, so this one goes alone.
+                try:
+                    answers[ip] = self.lookup(ip, retries=retries, timeout=timeout)
+                except InternetDataError as err:
+                    answers[ip] = err
+        return {ip: answers[unmapped(ip)] for ip in asked}
 
     def close(self) -> None:
         self._client.get_httpx_client().close()
@@ -142,6 +429,39 @@ class InternetData:
         tb: TracebackType | None,
     ) -> None:
         self.close()
+
+    # One POST /batch, mapped back onto the addresses it was asked about. A chunk-level
+    # failure - the call refused, the transport failing, the retries exhausted - becomes
+    # every address's error, exactly as it would have been had each been looked up alone.
+    def _lookup_chunk(
+        self,
+        chunk: list[str],
+        retries: float | None,
+        timeout: float | None,
+        led: dict[str, Any],
+    ) -> dict[str, Result | InternetDataError]:
+        def call() -> dict[str, Any]:
+            res = request(
+                lookup_batch,
+                self._client,
+                self._bound(timeout),
+                decode=False,
+                body=BatchLookupRequest(ips=list(chunk)),
+            )
+            return batch_body(res)
+
+        try:
+            body = self._retrying(call, self._retries if retries is None else retries)
+        except InternetDataError as err:
+            answers: dict[str, Result | InternetDataError] = {ip: err for ip in chunk}
+        else:
+            answers = batch_answers(chunk, body)
+        for ip, answer in answers.items():
+            if self._cache is not None and isinstance(answer, Result):
+                self._cache.put(ip, answer)
+            if ip in led:
+                self._flights.land(ip, led[ip], answer)
+        return answers
 
     # A per-call timeout, checked, or the client's own when the call gave none.
     def _bound(self, timeout: float | None) -> float | None:
@@ -382,6 +702,11 @@ class OauthApi:
     with no key to sign in, then a second one with the key the sign-in hands over. The
     `client_id` is your registered one, issued on request from support@internetdata.io.
 
+    Every request here goes to the apex of the API host, where InternetData's authorization
+    server is: `https://internetdata.io` for `https://api.internetdata.io`, and
+    `https://<env>.internetdata.io` for `https://api-<env>.internetdata.io`. Any other base
+    URL is used as given.
+
     `metadata`, `device_authorization` and `revoke` are retried like a lookup. The token
     exchanges are sent exactly once, because the server spends what they present. A
     refusal is an `OauthError` and is never retried.
@@ -486,7 +811,7 @@ class OauthApi:
         `exchange_authorization_code` (and `state`, when one was given), or with an `error`.
         """
         return authorization_url(
-            self._owner._base_url,
+            self._owner._oauth_base,
             client_id,
             redirect_uri,
             code_challenge,
@@ -596,4 +921,5 @@ class OauthApi:
         body: dict[str, Any] | None = None,
     ) -> httpx.Response:
         bound = self._owner._bound(timeout)
-        return oauth_request(self._owner._client, method, path, form, bound, body)
+        url = f"{self._owner._oauth_base}{path}"
+        return oauth_request(self._owner._client, method, url, form, bound, body)

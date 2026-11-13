@@ -1,5 +1,5 @@
 """Plumbing the sync and the async client both need: transport wiring, the deadline on
-each attempt, response unwrapping, and the retry policy."""
+each attempt, response unwrapping, the retry policy, and the per-instance cache."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import secrets
 import threading
 import time
@@ -18,19 +19,27 @@ from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import IO, Any, TypeVar, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
+from cachetools import TTLCache
 
 from ._generated.client import AuthenticatedClient, Client
 from ._generated.types import UNSET, Unset
 from .errors import InternetDataError, error_from_response, oauth_error_from
-from .models import Database, Download, Pkce, to_database, to_download
+from .models import Database, Download, Pkce, Result, to_database, to_download, to_result
 
-DEFAULT_BASE_URL = "https://internetdata.io"
+DEFAULT_BASE_URL = "https://api.internetdata.io"
+DEFAULT_CONCURRENCY = 8
 DEFAULT_RETRIES = 2
+DEFAULT_CACHE_MAX_SIZE = 10_000
+DEFAULT_CACHE_TTL = 3600.0
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_DOWNLOADS_LIMIT = 50
+
+# The most addresses POST /batch takes in one call; a larger batch is sent in chunks of
+# this size.
+BATCH_MAX = 1000
 
 OAUTH_METADATA_PATH = "/.well-known/oauth-authorization-server"
 OAUTH_DEVICE_AUTHORIZATION_PATH = "/oauth/device_authorization"
@@ -102,6 +111,24 @@ def build_client(
         timeout=httpx.Timeout(timeout),
         httpx_args=httpx_args,
     )
+
+
+# A base URL on the API host (`api.`, or `api-<env>.` for an environment).
+_API_HOST = re.compile(r"api(?:-([^.]+))?\.(.+)", re.IGNORECASE)
+
+
+def oauth_base(base_url: str) -> str:
+    """Where the `oauth` accessor asks: the apex the API host serves, since InternetData's
+    authorization server issues at the apex, not on the API host. `api.` is dropped and
+    `api-<env>.` becomes `<env>.`, so `https://api.internetdata.io` signs in at
+    `https://internetdata.io`; any other base URL is used as given."""
+    base_url = base_url.rstrip("/")
+    parts = urlsplit(base_url)
+    match = _API_HOST.fullmatch(parts.netloc)
+    if match is None:
+        return base_url
+    env, rest = match.groups()
+    return urlunsplit(parts._replace(netloc=f"{env}.{rest}" if env else rest))
 
 
 def build_transfer_client(
@@ -216,6 +243,86 @@ def check_retries(retries: float) -> float:
     return retries
 
 
+def call_retries(retries: float | None) -> float | None:
+    """A per-call `retries`, checked as the client's is, or None for the client's own."""
+    return None if retries is None else check_retries(retries)
+
+
+def check_client_concurrency(concurrency: int) -> int:
+    """A client's `concurrency`, once it is a whole number of at least 1, refused where it
+    is SET as a retry count is: taken as it came, 0, -1, NaN and `True` would run each batch
+    one chunk at a time, 1.5 two, and a string, None or a list fail every batch that sent
+    anything with a raw `TypeError` (measured on the VPNDetection SDK, 2026-11-11)."""
+    if isinstance(concurrency, bool) or not isinstance(concurrency, int) or concurrency < 1:
+        raise ValueError(f"concurrency must be a whole number of at least 1, not {concurrency!r}")
+    return concurrency
+
+
+def check_concurrency(concurrency: int | None) -> None:
+    """Refuse a per-call concurrency that could never send a chunk, before anything is sent,
+    rather than quietly running it as 1."""
+    if concurrency is None:
+        return
+    if isinstance(concurrency, bool) or not isinstance(concurrency, int) or concurrency < 1:
+        raise InternetDataError(
+            "bad_request", f"concurrency must be a whole number of at least 1, got {concurrency!r}"
+        )
+
+
+def chunked(ips: list[str], size: int) -> list[list[str]]:
+    return [ips[i : i + size] for i in range(0, len(ips), size)]
+
+
+def entry_error(entry: dict[str, Any]) -> InternetDataError:
+    """A per-entry failure inside a successful batch: the status the single lookup would
+    have answered, and its message, with no headers at all - so a 429 here is a spent
+    allowance, which is the only kind the API puts in an entry."""
+    return error_from_response(int(entry["status"]), httpx.Headers(), {"error": entry.get("error")})
+
+
+def batch_body(res: httpx.Response) -> dict[str, Any]:
+    """A chunk's answer, once it holds `results` or `errors` and neither is anything but a
+    map. Anything else is the whole chunk unreadable, a retried `server_error` carrying the
+    status. Each entry is read on its own by `batch_answers`, so one it cannot read is that
+    address's error alone."""
+    body = unwrap(res)
+    members = [body.get(name) for name in ("results", "errors")]
+    if all(m is None for m in members) or any(
+        m is not None and not isinstance(m, dict) for m in members
+    ):
+        raise InternetDataError(
+            "server_error", "the batch answer held neither results nor errors", res.status_code
+        )
+    return body
+
+
+def batch_answers(chunk: list[str], body: dict[str, Any]) -> dict[str, Result | InternetDataError]:
+    """One chunk's answer, mapped back onto the addresses it was asked about.
+
+    Every address lands in exactly one of `results` and `errors`; an address in neither
+    is the server breaking its own contract, and is reported as such rather than lost.
+    """
+    results = body.get("results") or {}
+    errors = body.get("errors") or {}
+    out: dict[str, Result | InternetDataError] = {}
+    for ip in chunk:
+        if ip in results:
+            try:
+                out[ip] = parse_entry(results[ip], to_result, 200)
+            except InternetDataError as err:
+                out[ip] = err
+        elif ip in errors:
+            try:
+                out[ip] = entry_error(errors[ip])
+            except (AttributeError, KeyError, TypeError, ValueError) as exc:
+                out[ip] = malformed(exc, 200)
+        else:
+            out[ip] = InternetDataError(
+                "server_error", f"the batch answer did not include {ip}", 200
+            )
+    return out
+
+
 def storage_refusal(res: httpx.Response) -> InternetDataError:
     """What object storage refusing a download link becomes.
 
@@ -277,26 +384,42 @@ def part_file(destination: str | os.PathLike[str]) -> Iterator[IO[bytes]]:
 
 
 def request(
-    endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
+    endpoint: ModuleType,
+    client: AuthenticatedClient,
+    bound: float | None,
+    *,
+    decode: bool = True,
+    **params: Any,
 ) -> httpx.Response:
     """One attempt at one generated endpoint, finished within `bound` seconds, or unbounded
-    when that is None, and its answer checked by `decoded`.
+    when that is None, and its answer checked by `decoded` unless `decode` is False.
 
     Assembled from the endpoint module's `_get_kwargs` and `_build_response` because its
     `sync_detailed` sends through httpx alone, and httpx has no bound on the attempt.
+
+    The lookups are not decoded: the spec requires every member of a detail object while
+    the API answers `{}` under a false flag, so the generated decoder refuses every answer
+    holding one. `models` reads them, member by member.
     """
     http = client.get_httpx_client()
     req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
-    return decoded(endpoint, client, exchange(http, req, bound))
+    res = exchange(http, req, bound)
+    return decoded(endpoint, client, res) if decode else res
 
 
 async def request_async(
-    endpoint: ModuleType, client: AuthenticatedClient, bound: float | None, **params: Any
+    endpoint: ModuleType,
+    client: AuthenticatedClient,
+    bound: float | None,
+    *,
+    decode: bool = True,
+    **params: Any,
 ) -> httpx.Response:
     """`request`, awaited."""
     http = client.get_async_httpx_client()
     req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))
-    return decoded(endpoint, client, await exchange_async(http, req, bound))
+    res = await exchange_async(http, req, bound)
+    return decoded(endpoint, client, res) if decode else res
 
 
 def decoded(
@@ -559,13 +682,19 @@ def parse_body(res: httpx.Response, parse: Callable[[dict[str, Any]], T]) -> T:
     """A served body through the model layer, with a malformed one reported as the
     server's failure, carrying its status, rather than as a traceback out of a dataclass
     constructor."""
-    body = unwrap(res)
+    return parse_entry(unwrap(res), parse, res.status_code)
+
+
+def parse_entry(body: Any, parse: Callable[[dict[str, Any]], T], status: int) -> T:
+    """`parse_body` for a body already decoded: an answer, or one entry of a batch's."""
+    if not isinstance(body, dict):
+        raise InternetDataError("server_error", "the API answered with a non-object body", status)
     try:
         return parse(body)
     # AttributeError too: metadata's `schema` or `sample` as an array instead of an object
     # escaped 2.7.1 raw, out of `.items()` (measured 2026-10-12).
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        raise malformed(exc, res.status_code) from exc
+        raise malformed(exc, status) from exc
 
 
 def redirect_location(res: httpx.Response) -> str:
@@ -640,6 +769,89 @@ def retry_delay(err: InternetDataError, attempt: int, retries: float) -> float |
     if err.retry_after_seconds is not None and err.retry_after_seconds <= RETRY_AFTER_CEILING:
         return err.retry_after_seconds
     return _BACKOFF_BASE * (2.0**attempt)
+
+
+class Cache:
+    """A per-client result cache.
+
+    Never global or static: two clients with different keys are on different plans and
+    entitled to different fields, so a shared cache would serve one of them the other's
+    shape. The lock is not optional, because the sync batch drives lookups from a thread
+    pool and `TTLCache` is not thread-safe.
+    """
+
+    def __init__(self, max_size: int, ttl: float) -> None:
+        self._entries: TTLCache[str, Result] = TTLCache(maxsize=max_size, ttl=ttl)
+        self._lock = threading.Lock()
+
+    def get(self, ip: str) -> Result | None:
+        with self._lock:
+            return self._entries.get(ip)
+
+    def put(self, ip: str, result: Result) -> None:
+        with self._lock:
+            self._entries[ip] = result
+
+
+class Abandoned(Exception):
+    """A request's leader stopped before its answer landed; a waiter asks again."""
+
+
+class Flights:
+    """The addresses with a request in flight, so concurrent misses share one.
+
+    A lookup that misses joins the request in flight for its address or leads one; a batch
+    joins those and boards the rest before it builds its chunks, so a lookup arriving
+    meanwhile awaits the batch. The registry is ours rather than a coalescing cache's
+    because a batch has to know which addresses it leads before it sends any. `make` builds
+    what a waiter blocks or awaits on: a `concurrent.futures.Future` for the sync client,
+    the running loop's future for the async one.
+    """
+
+    def __init__(self, make: Callable[[], Any]) -> None:
+        self._make = make
+        self._lock = threading.Lock()
+        self._flights: dict[str, Any] = {}
+
+    def board(self, ips: list[str]) -> tuple[dict[str, Any], dict[str, Any]]:
+        led: dict[str, Any] = {}
+        joined: dict[str, Any] = {}
+        with self._lock:
+            for ip in ips:
+                flight = self._flights.get(ip)
+                if flight is not None:
+                    joined[ip] = flight
+                    continue
+                flight = self._make()
+                self._flights[ip] = flight
+                led[ip] = flight
+        return led, joined
+
+    def land(self, ip: str, flight: Any, answer: Result | BaseException) -> None:
+        """Hands every waiter the answer and takes the address off the board. Cache a
+        served answer FIRST: a caller that missed just before it landed finds no flight
+        after this, and reads the cache again before it sends."""
+        with self._lock:
+            if self._flights.get(ip) is flight:
+                del self._flights[ip]
+        if flight.done():
+            return
+        if isinstance(answer, BaseException):
+            flight.set_exception(answer)
+            # Retrieved here, so an answer nobody joined logs no warning when collected.
+            flight.exception()
+        else:
+            flight.set_result(answer)
+
+
+def landed_error(err: InternetDataError) -> InternetDataError:
+    """One waiter's own copy of a shared failure, so raising it in one thread or task
+    never grows the traceback another raises. Built by hand: `copy.copy` calls the
+    constructor with `args` alone, which lacks the kind."""
+    clone = type(err).__new__(type(err), *err.args)
+    clone.__dict__.update(err.__dict__)
+    clone.__cause__ = err.__cause__
+    return clone
 
 
 # The generated client bakes the API key into every request it builds. None of the OAuth

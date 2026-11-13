@@ -13,6 +13,10 @@ SECRET = "INTERNETDATA_STAGING_KEY"
 
 STAGING = "https://staging.internetdata.io"
 
+# The API hosts, where the lookups are served, and the database calls too.
+STAGING_API = "https://api-staging.internetdata.io"
+PROD_API = "https://api.internetdata.io"
+
 
 def key() -> str:
     """The staging credential, or an empty string.
