@@ -100,17 +100,33 @@ def build_client(
     httpx_args: dict[str, Any] = {}
     if transport is not None:
         httpx_args["transport"] = transport
+    headers = {"User-Agent": user_agent()}
     if api_key is None:
         return cast(
             AuthenticatedClient,
-            Client(base_url=base_url, timeout=httpx.Timeout(timeout), httpx_args=httpx_args),
+            Client(
+                base_url=base_url,
+                headers=headers,
+                timeout=httpx.Timeout(timeout),
+                httpx_args=httpx_args,
+            ),
         )
     return AuthenticatedClient(
         base_url=base_url,
         token=api_key,
+        headers=headers,
         timeout=httpx.Timeout(timeout),
         httpx_args=httpx_args,
     )
+
+
+def user_agent() -> str:
+    """`internetdata-python/<version>`, on every request this library makes, object storage's
+    included, so its traffic, and which releases are still in use, can be counted. Read at
+    call time: the package's `__init__` imports this module before it sets the version."""
+    from . import __version__
+
+    return f"internetdata-python/{__version__}"
 
 
 # A base URL on the API host (`api.`, or `api-<env>.` for an environment).
@@ -149,6 +165,7 @@ def build_transfer_client(
     by going along with it.
     """
     return httpx.Client(
+        headers={"User-Agent": user_agent()},
         timeout=httpx.Timeout(None, connect=timeout),
         transport=transport,
         follow_redirects=True,
@@ -160,6 +177,7 @@ def build_async_transfer_client(
 ) -> httpx.AsyncClient:
     """`build_transfer_client`, for asyncio."""
     return httpx.AsyncClient(
+        headers={"User-Agent": user_agent()},
         timeout=httpx.Timeout(None, connect=timeout),
         transport=transport,
         follow_redirects=True,

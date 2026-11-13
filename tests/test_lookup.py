@@ -21,6 +21,7 @@ import pytest
 from helpers import (
     API,
     API_KEY,
+    LIST_PATH,
     TESTDATA,
     ClientFactory,
     Lookups,
@@ -458,6 +459,36 @@ def test_a_lookup_carries_the_key_and_a_keyless_one_none(make_client: ClientFact
     make_client(transport=httpx.MockTransport(serve), api_key=None).lookup("1.1.1.1")
 
     assert seen == [f"Bearer {API_KEY}", None]
+
+
+def test_every_request_names_this_library_in_its_user_agent(
+    make_client: ClientFactory, tmp_path: Any
+) -> None:
+    agents: list[str] = []
+
+    def serve(request: httpx.Request) -> httpx.Response:
+        agents.append(request.headers["user-agent"])
+        if request.url.path == "/api/v2/database/download":
+            return httpx.Response(302, headers={"location": "https://storage.example/blob"})
+        if request.url.host == "storage.example":
+            return httpx.Response(200, content=b"x")
+        if request.url.path == LIST_PATH:
+            return httpx.Response(200, json={"databases": []})
+        if request.url.path == "/batch":
+            return httpx.Response(200, json={"results": {"1.1.1.1": answer("1.1.1.1")}})
+        if request.url.path.startswith("/.well-known/"):
+            return httpx.Response(200, json={"issuer": "i", "authorization_endpoint": "a"})
+        return httpx.Response(200, json=answer("8.8.8.8"))
+
+    client = make_client(transport=httpx.MockTransport(serve), cache=False, retries=0)
+    client.lookup("8.8.8.8")
+    client.lookup_batch(["1.1.1.1"])
+    client.database.list()
+    client.database.download_bytes("bogon_ip_v1", "csvgz")
+    with pytest.raises(InternetDataError):
+        client.oauth.metadata()
+
+    assert agents == [f"internetdata-python/{internetdata.__version__}"] * 6
 
 
 MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
