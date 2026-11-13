@@ -21,7 +21,9 @@ import pytest
 from credential import PROD_API, STAGING, STAGING_API
 from staging import PACKAGE, Recorder
 
-from internetdata import InternetData, InternetDataError, Result, is_bogon
+# Only what every release in the range exports: the lookups' own names are imported inside
+# the tests, which the version gate skips on an older release before they run.
+from internetdata import InternetData, InternetDataError
 
 # The spec's own example address, and an AS and a domain every database knows.
 PROBE = "146.70.116.130"
@@ -71,6 +73,8 @@ def test_a_keyless_as_and_domain_lookup_read_as_served(api: str) -> None:
 
 @pytest.mark.parametrize("api", APIS)
 def test_my_ip_answers_the_calling_address(api: str) -> None:
+    from internetdata import is_bogon
+
     with InternetData(base_url=APIS[api]) as client:
         result = client.my_ip()
 
@@ -80,6 +84,8 @@ def test_my_ip_answers_the_calling_address(api: str) -> None:
 
 @pytest.mark.parametrize("api", APIS)
 def test_a_keyless_batch_is_refused_once_and_its_bogon_still_answered(api: str) -> None:
+    from internetdata import Result
+
     keyless = Keyless()
     with InternetData(base_url=APIS[api], transport=keyless) as client:
         # Two addresses on the wire: a keyless batch of one is answered as its lookup.
