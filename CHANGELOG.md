@@ -9,6 +9,8 @@ What each release changed for you, newest first. Each line is a commit's summary
 - Re-pin the spec to 2026.11.13: the lookups and the entitlement ([`47bd0f3`](https://github.com/internetdata/sdk-python/commit/47bd0f3c1531efd004f6e1cc1b99fd5bc3fff9e4))
 - Look up addresses, ASes and domains, on api.internetdata.io by default ([`56b3434`](https://github.com/internetdata/sdk-python/commit/56b343420d6f769306d98a36d4bd9887f54a592e))
 - Name this library in every request's User-Agent ([`74d7001`](https://github.com/internetdata/sdk-python/commit/74d70013045309845102dcd80fa6bd31c147709c))
+- Re-pin the spec: a detail object requires no member ([`75beb71`](https://github.com/internetdata/sdk-python/commit/75beb712c8c76d2a8541e51359ea44bfcb7715d6))
+- Refuse a lookup of anything but an IP address before sending it ([`86da8e8`](https://github.com/internetdata/sdk-python/commit/86da8e884d645049deaf59b6cee01dad97183212))
 
 ## 2.10.1 - 2026-11-09
 
