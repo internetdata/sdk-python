@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="CarrierDetail")
 
 
@@ -13,18 +15,18 @@ T = TypeVar("T", bound="CarrierDetail")
 class CarrierDetail:
     """
     Attributes:
-        name (str): The mobile carrier.
-        mcc (str): Its mobile country code.
-        mnc (str): Its mobile network code.
-        country (str): ISO 3166 country code.
-        confidence (str): `high`, `medium` or `low`.
+        name (str | Unset): The mobile carrier.
+        mcc (str | Unset): Its mobile country code.
+        mnc (str | Unset): Its mobile network code.
+        country (str | Unset): ISO 3166 country code.
+        confidence (str | Unset): `high`, `medium` or `low`.
     """
 
-    name: str
-    mcc: str
-    mnc: str
-    country: str
-    confidence: str
+    name: str | Unset = UNSET
+    mcc: str | Unset = UNSET
+    mnc: str | Unset = UNSET
+    country: str | Unset = UNSET
+    confidence: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,30 +42,32 @@ class CarrierDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "name": name,
-                "mcc": mcc,
-                "mnc": mnc,
-                "country": country,
-                "confidence": confidence,
-            }
-        )
+        field_dict.update({})
+        if name is not UNSET:
+            field_dict["name"] = name
+        if mcc is not UNSET:
+            field_dict["mcc"] = mcc
+        if mnc is not UNSET:
+            field_dict["mnc"] = mnc
+        if country is not UNSET:
+            field_dict["country"] = country
+        if confidence is not UNSET:
+            field_dict["confidence"] = confidence
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        name = d.pop("name")
+        name = d.pop("name", UNSET)
 
-        mcc = d.pop("mcc")
+        mcc = d.pop("mcc", UNSET)
 
-        mnc = d.pop("mnc")
+        mnc = d.pop("mnc", UNSET)
 
-        country = d.pop("country")
+        country = d.pop("country", UNSET)
 
-        confidence = d.pop("confidence")
+        confidence = d.pop("confidence", UNSET)
 
         carrier_detail = cls(
             name=name,

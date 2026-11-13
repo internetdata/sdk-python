@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="ProxyDetail")
 
 
@@ -13,22 +15,22 @@ T = TypeVar("T", bound="ProxyDetail")
 class ProxyDetail:
     """
     Attributes:
-        provider (str): The proxy pool's ID in its catalog, empty where unattributed.
-        provider_name (str): The name the catalog gives it.
-        first_seen (str): The first day of the window the address was seen as an exit.
-        last_seen (str): The last day it was.
-        hits (int): How many times it was seen in the window.
-        hits_days_pct (int): On what share of the window's days, in percent.
-        providers_num (int): How many pools it was seen in.
+        provider (str | Unset): The proxy pool's ID in its catalog, empty where unattributed.
+        provider_name (str | Unset): The name the catalog gives it.
+        first_seen (str | Unset): The first day of the window the address was seen as an exit.
+        last_seen (str | Unset): The last day it was.
+        hits (int | Unset): How many times it was seen in the window.
+        hits_days_pct (int | Unset): On what share of the window's days, in percent.
+        providers_num (int | Unset): How many pools it was seen in.
     """
 
-    provider: str
-    provider_name: str
-    first_seen: str
-    last_seen: str
-    hits: int
-    hits_days_pct: int
-    providers_num: int
+    provider: str | Unset = UNSET
+    provider_name: str | Unset = UNSET
+    first_seen: str | Unset = UNSET
+    last_seen: str | Unset = UNSET
+    hits: int | Unset = UNSET
+    hits_days_pct: int | Unset = UNSET
+    providers_num: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,36 +50,40 @@ class ProxyDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "provider": provider,
-                "provider_name": provider_name,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-                "hits": hits,
-                "hits_days_pct": hits_days_pct,
-                "providers_num": providers_num,
-            }
-        )
+        field_dict.update({})
+        if provider is not UNSET:
+            field_dict["provider"] = provider
+        if provider_name is not UNSET:
+            field_dict["provider_name"] = provider_name
+        if first_seen is not UNSET:
+            field_dict["first_seen"] = first_seen
+        if last_seen is not UNSET:
+            field_dict["last_seen"] = last_seen
+        if hits is not UNSET:
+            field_dict["hits"] = hits
+        if hits_days_pct is not UNSET:
+            field_dict["hits_days_pct"] = hits_days_pct
+        if providers_num is not UNSET:
+            field_dict["providers_num"] = providers_num
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        provider = d.pop("provider")
+        provider = d.pop("provider", UNSET)
 
-        provider_name = d.pop("provider_name")
+        provider_name = d.pop("provider_name", UNSET)
 
-        first_seen = d.pop("first_seen")
+        first_seen = d.pop("first_seen", UNSET)
 
-        last_seen = d.pop("last_seen")
+        last_seen = d.pop("last_seen", UNSET)
 
-        hits = d.pop("hits")
+        hits = d.pop("hits", UNSET)
 
-        hits_days_pct = d.pop("hits_days_pct")
+        hits_days_pct = d.pop("hits_days_pct", UNSET)
 
-        providers_num = d.pop("providers_num")
+        providers_num = d.pop("providers_num", UNSET)
 
         proxy_detail = cls(
             provider=provider,

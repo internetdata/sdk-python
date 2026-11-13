@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="DnsResolverDetail")
 
 
@@ -13,20 +15,20 @@ T = TypeVar("T", bound="DnsResolverDetail")
 class DnsResolverDetail:
     """
     Attributes:
-        port (int): The port it answered on.
-        recursion_available (bool): It offered recursion.
-        rcode (int): Its answer's response code.
-        answer_correct (bool): Its answer was right.
-        first_seen (str): The first day it answered.
-        last_seen (str): The last day it did.
+        port (int | Unset): The port it answered on.
+        recursion_available (bool | Unset): It offered recursion.
+        rcode (int | Unset): Its answer's response code.
+        answer_correct (bool | Unset): Its answer was right.
+        first_seen (str | Unset): The first day it answered.
+        last_seen (str | Unset): The last day it did.
     """
 
-    port: int
-    recursion_available: bool
-    rcode: int
-    answer_correct: bool
-    first_seen: str
-    last_seen: str
+    port: int | Unset = UNSET
+    recursion_available: bool | Unset = UNSET
+    rcode: int | Unset = UNSET
+    answer_correct: bool | Unset = UNSET
+    first_seen: str | Unset = UNSET
+    last_seen: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,33 +46,36 @@ class DnsResolverDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "port": port,
-                "recursion_available": recursion_available,
-                "rcode": rcode,
-                "answer_correct": answer_correct,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-            }
-        )
+        field_dict.update({})
+        if port is not UNSET:
+            field_dict["port"] = port
+        if recursion_available is not UNSET:
+            field_dict["recursion_available"] = recursion_available
+        if rcode is not UNSET:
+            field_dict["rcode"] = rcode
+        if answer_correct is not UNSET:
+            field_dict["answer_correct"] = answer_correct
+        if first_seen is not UNSET:
+            field_dict["first_seen"] = first_seen
+        if last_seen is not UNSET:
+            field_dict["last_seen"] = last_seen
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        port = d.pop("port")
+        port = d.pop("port", UNSET)
 
-        recursion_available = d.pop("recursion_available")
+        recursion_available = d.pop("recursion_available", UNSET)
 
-        rcode = d.pop("rcode")
+        rcode = d.pop("rcode", UNSET)
 
-        answer_correct = d.pop("answer_correct")
+        answer_correct = d.pop("answer_correct", UNSET)
 
-        first_seen = d.pop("first_seen")
+        first_seen = d.pop("first_seen", UNSET)
 
-        last_seen = d.pop("last_seen")
+        last_seen = d.pop("last_seen", UNSET)
 
         dns_resolver_detail = cls(
             port=port,

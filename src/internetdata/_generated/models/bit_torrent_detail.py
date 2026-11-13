@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="BitTorrentDetail")
 
 
@@ -13,28 +15,28 @@ T = TypeVar("T", bound="BitTorrentDetail")
 class BitTorrentDetail:
     """
     Attributes:
-        verified (bool): A client here answered, or two or more reported it at once.
-        id_matches_ip (bool): A client here derived its node ID from the address (BEP 42).
-        first_seen (str): The first day a client was seen here.
-        last_seen (str): The last day.
-        last_reachable (str): The last day one answered, empty when none did.
-        days_seen (int): On how many days.
-        num_ports (int): Distinct ports over the window.
-        peak_num_ports (int): The most on one day.
-        indexer (bool): A DHT indexer rather than people.
-        clients (list[str]): The two-letter codes its clients name themselves by.
+        verified (bool | Unset): A client here answered, or two or more reported it at once.
+        id_matches_ip (bool | Unset): A client here derived its node ID from the address (BEP 42).
+        first_seen (str | Unset): The first day a client was seen here.
+        last_seen (str | Unset): The last day.
+        last_reachable (str | Unset): The last day one answered, empty when none did.
+        days_seen (int | Unset): On how many days.
+        num_ports (int | Unset): Distinct ports over the window.
+        peak_num_ports (int | Unset): The most on one day.
+        indexer (bool | Unset): A DHT indexer rather than people.
+        clients (list[str] | Unset): The two-letter codes its clients name themselves by.
     """
 
-    verified: bool
-    id_matches_ip: bool
-    first_seen: str
-    last_seen: str
-    last_reachable: str
-    days_seen: int
-    num_ports: int
-    peak_num_ports: int
-    indexer: bool
-    clients: list[str]
+    verified: bool | Unset = UNSET
+    id_matches_ip: bool | Unset = UNSET
+    first_seen: str | Unset = UNSET
+    last_seen: str | Unset = UNSET
+    last_reachable: str | Unset = UNSET
+    days_seen: int | Unset = UNSET
+    num_ports: int | Unset = UNSET
+    peak_num_ports: int | Unset = UNSET
+    indexer: bool | Unset = UNSET
+    clients: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,49 +58,58 @@ class BitTorrentDetail:
 
         indexer = self.indexer
 
-        clients = self.clients
+        clients: list[str] | Unset = UNSET
+        if not isinstance(self.clients, Unset):
+            clients = self.clients
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "verified": verified,
-                "id_matches_ip": id_matches_ip,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-                "last_reachable": last_reachable,
-                "days_seen": days_seen,
-                "num_ports": num_ports,
-                "peak_num_ports": peak_num_ports,
-                "indexer": indexer,
-                "clients": clients,
-            }
-        )
+        field_dict.update({})
+        if verified is not UNSET:
+            field_dict["verified"] = verified
+        if id_matches_ip is not UNSET:
+            field_dict["id_matches_ip"] = id_matches_ip
+        if first_seen is not UNSET:
+            field_dict["first_seen"] = first_seen
+        if last_seen is not UNSET:
+            field_dict["last_seen"] = last_seen
+        if last_reachable is not UNSET:
+            field_dict["last_reachable"] = last_reachable
+        if days_seen is not UNSET:
+            field_dict["days_seen"] = days_seen
+        if num_ports is not UNSET:
+            field_dict["num_ports"] = num_ports
+        if peak_num_ports is not UNSET:
+            field_dict["peak_num_ports"] = peak_num_ports
+        if indexer is not UNSET:
+            field_dict["indexer"] = indexer
+        if clients is not UNSET:
+            field_dict["clients"] = clients
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        verified = d.pop("verified")
+        verified = d.pop("verified", UNSET)
 
-        id_matches_ip = d.pop("id_matches_ip")
+        id_matches_ip = d.pop("id_matches_ip", UNSET)
 
-        first_seen = d.pop("first_seen")
+        first_seen = d.pop("first_seen", UNSET)
 
-        last_seen = d.pop("last_seen")
+        last_seen = d.pop("last_seen", UNSET)
 
-        last_reachable = d.pop("last_reachable")
+        last_reachable = d.pop("last_reachable", UNSET)
 
-        days_seen = d.pop("days_seen")
+        days_seen = d.pop("days_seen", UNSET)
 
-        num_ports = d.pop("num_ports")
+        num_ports = d.pop("num_ports", UNSET)
 
-        peak_num_ports = d.pop("peak_num_ports")
+        peak_num_ports = d.pop("peak_num_ports", UNSET)
 
-        indexer = d.pop("indexer")
+        indexer = d.pop("indexer", UNSET)
 
-        clients = cast(list[str], d.pop("clients"))
+        clients = cast(list[str], d.pop("clients", UNSET))
 
         bit_torrent_detail = cls(
             verified=verified,

@@ -221,9 +221,7 @@ class AsyncInternetData:
 
     async def _serve(self, ip: str, retries: float | None, timeout: float | None) -> Result:
         async def call() -> Result:
-            res = await request_async(
-                lookup_ip, self._client, self._bound(timeout), decode=False, ip=ip
-            )
+            res = await request_async(lookup_ip, self._client, self._bound(timeout), ip=ip)
             return parse_body(res, to_result)
 
         return await self._retrying(call, self._retries if retries is None else retries)
@@ -239,9 +237,7 @@ class AsyncInternetData:
         call_retries(retries)
 
         async def call() -> AsnResult:
-            res = await request_async(
-                lookup_asn, self._client, self._bound(timeout), decode=False, asn=asn
-            )
+            res = await request_async(lookup_asn, self._client, self._bound(timeout), asn=asn)
             return parse_body(res, to_asn_result)
 
         return await self._retrying(call, self._retries if retries is None else retries)
@@ -259,7 +255,7 @@ class AsyncInternetData:
 
         async def call() -> DomainResult:
             res = await request_async(
-                lookup_domain, self._client, self._bound(timeout), decode=False, domain=domain
+                lookup_domain, self._client, self._bound(timeout), domain=domain
             )
             return parse_body(res, to_domain_result)
 
@@ -280,9 +276,7 @@ class AsyncInternetData:
         call_retries(retries)
 
         async def call() -> Result:
-            res = await request_async(
-                lookup_my_ip, self._client, self._bound(timeout), decode=False
-            )
+            res = await request_async(lookup_my_ip, self._client, self._bound(timeout))
             return parse_body(res, to_result)
 
         return await self._retrying(call, self._retries if retries is None else retries)
@@ -312,9 +306,7 @@ class AsyncInternetData:
         call_retries(retries)
 
         async def call() -> Entitlement:
-            res = await request_async(
-                my_entitlement, self._client, self._bound(timeout), decode=False
-            )
+            res = await request_async(my_entitlement, self._client, self._bound(timeout))
             return parse_body(res, to_entitlement)
 
         return await self._retrying(call, self._retries if retries is None else retries)

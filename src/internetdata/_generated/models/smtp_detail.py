@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="SmtpDetail")
 
 
@@ -13,18 +15,18 @@ T = TypeVar("T", bound="SmtpDetail")
 class SmtpDetail:
     """
     Attributes:
-        port (int): The port the server answered on.
-        banner (str): Its banner.
-        session_ok (bool): A session was set up.
-        first_seen (str): The first day it answered.
-        last_seen (str): The last day it did.
+        port (int | Unset): The port the server answered on.
+        banner (str | Unset): Its banner.
+        session_ok (bool | Unset): A session was set up.
+        first_seen (str | Unset): The first day it answered.
+        last_seen (str | Unset): The last day it did.
     """
 
-    port: int
-    banner: str
-    session_ok: bool
-    first_seen: str
-    last_seen: str
+    port: int | Unset = UNSET
+    banner: str | Unset = UNSET
+    session_ok: bool | Unset = UNSET
+    first_seen: str | Unset = UNSET
+    last_seen: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,30 +42,32 @@ class SmtpDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "port": port,
-                "banner": banner,
-                "session_ok": session_ok,
-                "first_seen": first_seen,
-                "last_seen": last_seen,
-            }
-        )
+        field_dict.update({})
+        if port is not UNSET:
+            field_dict["port"] = port
+        if banner is not UNSET:
+            field_dict["banner"] = banner
+        if session_ok is not UNSET:
+            field_dict["session_ok"] = session_ok
+        if first_seen is not UNSET:
+            field_dict["first_seen"] = first_seen
+        if last_seen is not UNSET:
+            field_dict["last_seen"] = last_seen
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        port = d.pop("port")
+        port = d.pop("port", UNSET)
 
-        banner = d.pop("banner")
+        banner = d.pop("banner", UNSET)
 
-        session_ok = d.pop("session_ok")
+        session_ok = d.pop("session_ok", UNSET)
 
-        first_seen = d.pop("first_seen")
+        first_seen = d.pop("first_seen", UNSET)
 
-        last_seen = d.pop("last_seen")
+        last_seen = d.pop("last_seen", UNSET)
 
         smtp_detail = cls(
             port=port,

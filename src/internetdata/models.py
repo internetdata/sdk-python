@@ -426,8 +426,8 @@ EntitlementPlanTier = Literal["free", "starter", "scale", "max"]
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ClassDetail:
     """A row of VPN IP, Tor IP, Relay IP, Hosting IP or CDN IP. Present and empty (every
-    field None) when the flag above it is false; a populated one carries every field.
-    `provider` is empty for an unattributed range, and on Tor."""
+    field None) when the flag above it is false. `provider` is empty for an unattributed
+    range, and on Tor."""
 
     provider: str | None = None
     provider_name: str | None = None
@@ -668,8 +668,7 @@ class Result:
     None on a plan without it.
 
     A detail object that is present but empty (every field `None`, Web IP's an empty
-    tuple) means the flag above it is false. A populated one always carries every one of
-    its keys.
+    tuple) means the flag above it is false.
 
     Frozen, because a cached answer is handed to every later caller of the same address.
     """
@@ -936,33 +935,14 @@ def to_entitlement(body: dict[str, Any]) -> Entitlement:
     return _record(Entitlement, body, "answer")
 
 
-# The lookups' detail objects: `{}` under a false flag, and otherwise every member the spec
-# requires, which for each of these is every member.
-_DETAILS = (
-    ClassDetail,
-    ProxyDetail,
-    PubproxyDetail,
-    CarrierDetail,
-    SatelliteDetail,
-    SshDetail,
-    SmtpDetail,
-    DnsResolverDetail,
-    BitTorrentDetail,
-    DisposableDetail,
-)
-
 R = TypeVar("R")
 
 
 def _record(cls: type[R], body: Any, name: str) -> R:
     """`body` as `cls`, each member read by the type its field names: one with no default
     must be present and is null only where that type allows None, and one defaulting to
-    None reads as None when absent or null. A detail object is `{}` or carries every member.
-    `raw` is the body itself."""
+    None reads as None when absent or null. `raw` is the body itself."""
     body = _of_type(body, name, dict)
-    whole = cls in _DETAILS
-    if whole and not body:
-        return cls()
     hints = _hints(cls)
     values: dict[str, Any] = {}
     for member in dataclasses.fields(cls):  # type: ignore[arg-type]
@@ -970,7 +950,7 @@ def _record(cls: type[R], body: Any, name: str) -> R:
             values["raw"] = body
             continue
         wire = f"{name}.{member.name}"
-        required = whole or member.default is dataclasses.MISSING
+        required = member.default is dataclasses.MISSING
         if member.name not in body:
             if required:
                 raise KeyError(wire)
@@ -978,7 +958,7 @@ def _record(cls: type[R], body: Any, name: str) -> R:
         value = body[member.name]
         arms = _arms(hints[member.name])
         if value is None:
-            if whole or type(None) not in arms:
+            if type(None) not in arms:
                 raise ValueError(f"{wire} is null")
             values[member.name] = None
             continue

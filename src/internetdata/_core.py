@@ -414,10 +414,6 @@ def request(
 
     Assembled from the endpoint module's `_get_kwargs` and `_build_response` because its
     `sync_detailed` sends through httpx alone, and httpx has no bound on the attempt.
-
-    The lookups are not decoded: the spec requires every member of a detail object while
-    the API answers `{}` under a false flag, so the generated decoder refuses every answer
-    holding one. `models` reads them, member by member.
     """
     http = client.get_httpx_client()
     req = http.build_request(**endpoint._get_kwargs(**params), timeout=httpx.Timeout(bound))

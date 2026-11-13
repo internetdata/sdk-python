@@ -499,14 +499,6 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     "is_vpn a number": ("lookup", answer("8.8.8.8", is_vpn=1)),
     "tor null": ("lookup", answer("8.8.8.8", tor=None)),
     "tor a list": ("lookup", answer("8.8.8.8", tor=[])),
-    "a detail missing a member": (
-        "lookup",
-        answer("8.8.8.8", is_vpn=True, vpn={"provider": "x", "provider_name": "X"}),
-    ),
-    "a detail's member null": (
-        "lookup",
-        {**PAID, "ip": "8.8.8.8", "hosting": {**PAID["hosting"], "provider": None}},
-    ),
     "a proxy's hits a numeric string": (
         "lookup",
         {
@@ -566,10 +558,6 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     "a domain's dns missing a type": (
         "lookup_domain",
         {**DOMAIN, "dns": {k: v for k, v in DOMAIN["dns"].items() if k != "mx"}},
-    ),
-    "a domain's disposable partly there": (
-        "lookup_domain",
-        {**DOMAIN, "is_disposable": True, "disposable": {"confidence": "high"}},
     ),
     "the entitlement's quota a numeric string": (
         "my_entitlement",
@@ -637,6 +625,17 @@ READABLE: dict[str, tuple[str, dict[str, Any], Callable[[Any], bool]]] = {
         "lookup",
         answer("8.8.8.8", is_vpn=False, vpn={}),
         lambda result: result.vpn is not None and result.vpn.provider is None,
+    ),
+    # The spec requires no member of a detail object, so neither does the client.
+    "a detail with some members": (
+        "lookup",
+        answer("8.8.8.8", is_vpn=True, vpn={"provider": "x"}),
+        lambda result: result.vpn.provider == "x" and result.vpn.confidence is None,
+    ),
+    "a detail's member null": (
+        "lookup",
+        {**PAID, "ip": "8.8.8.8", "hosting": {**PAID["hosting"], "provider": None}},
+        lambda result: result.hosting.provider is None,
     ),
     "a member this spec predates": (
         "lookup",
@@ -766,7 +765,7 @@ def test_every_member_the_pinned_spec_serves_is_on_the_lookup_model(name: str) -
     """The staleness pin on the hand-written lookup types, as on the database ones: a member
     a re-pin adds reaches the generated model and `raw`, and this turns red until the typed
     one has it. A member with no default is one the spec requires, which is what `_record`
-    reads it as; a detail object's members are all required once it is not `{}`."""
+    reads it as."""
     module, cls = LOOKUP_MODELS[name].split(".")
     wire = getattr(importlib.import_module(f"internetdata._generated.models.{module}"), cls)
     ours = getattr(internetdata, name)
@@ -776,9 +775,6 @@ def test_every_member_the_pinned_spec_serves_is_on_the_lookup_model(name: str) -
     modeled.pop("raw", None)
 
     assert set(served) == set(modeled), f"{name} and the spec disagree on its members"
-    if name.endswith("Detail") and name != "WebDetail":
-        assert all(f.default is attrs.NOTHING for f in served.values()), name
-        return
     required = {key for key, f in served.items() if f.default is attrs.NOTHING}
     assert required == {key for key, f in modeled.items() if f.default is dataclasses.MISSING}, (
         f"{name}: what the spec requires is not what the model requires"

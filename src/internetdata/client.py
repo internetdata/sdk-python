@@ -239,7 +239,7 @@ class InternetData:
 
     def _serve(self, ip: str, retries: float | None, timeout: float | None) -> Result:
         def call() -> Result:
-            res = request(lookup_ip, self._client, self._bound(timeout), decode=False, ip=ip)
+            res = request(lookup_ip, self._client, self._bound(timeout), ip=ip)
             return parse_body(res, to_result)
 
         return self._retrying(call, self._retries if retries is None else retries)
@@ -255,7 +255,7 @@ class InternetData:
         call_retries(retries)
 
         def call() -> AsnResult:
-            res = request(lookup_asn, self._client, self._bound(timeout), decode=False, asn=asn)
+            res = request(lookup_asn, self._client, self._bound(timeout), asn=asn)
             return parse_body(res, to_asn_result)
 
         return self._retrying(call, self._retries if retries is None else retries)
@@ -272,9 +272,7 @@ class InternetData:
         call_retries(retries)
 
         def call() -> DomainResult:
-            res = request(
-                lookup_domain, self._client, self._bound(timeout), decode=False, domain=domain
-            )
+            res = request(lookup_domain, self._client, self._bound(timeout), domain=domain)
             return parse_body(res, to_domain_result)
 
         return self._retrying(call, self._retries if retries is None else retries)
@@ -294,7 +292,7 @@ class InternetData:
         call_retries(retries)
 
         def call() -> Result:
-            res = request(lookup_my_ip, self._client, self._bound(timeout), decode=False)
+            res = request(lookup_my_ip, self._client, self._bound(timeout))
             return parse_body(res, to_result)
 
         return self._retrying(call, self._retries if retries is None else retries)
@@ -324,7 +322,7 @@ class InternetData:
         call_retries(retries)
 
         def call() -> Entitlement:
-            res = request(my_entitlement, self._client, self._bound(timeout), decode=False)
+            res = request(my_entitlement, self._client, self._bound(timeout))
             return parse_body(res, to_entitlement)
 
         return self._retrying(call, self._retries if retries is None else retries)

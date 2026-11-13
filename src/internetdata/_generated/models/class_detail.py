@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="ClassDetail")
 
 
@@ -13,16 +15,16 @@ T = TypeVar("T", bound="ClassDetail")
 class ClassDetail:
     """
     Attributes:
-        provider (str): The provider's ID in its catalog; empty for an unattributed range, and on Tor.
-        provider_name (str): The name the catalog gives the provider, empty where it names none.
-        confidence (str): `high`, `medium` or `low`: how sure we are the range is what the flag says.
-        last_seen (str): The last day the range was seen as such.
+        provider (str | Unset): The provider's ID in its catalog; empty for an unattributed range, and on Tor.
+        provider_name (str | Unset): The name the catalog gives the provider, empty where it names none.
+        confidence (str | Unset): `high`, `medium` or `low`: how sure we are the range is what the flag says.
+        last_seen (str | Unset): The last day the range was seen as such.
     """
 
-    provider: str
-    provider_name: str
-    confidence: str
-    last_seen: str
+    provider: str | Unset = UNSET
+    provider_name: str | Unset = UNSET
+    confidence: str | Unset = UNSET
+    last_seen: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,27 +38,28 @@ class ClassDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "provider": provider,
-                "provider_name": provider_name,
-                "confidence": confidence,
-                "last_seen": last_seen,
-            }
-        )
+        field_dict.update({})
+        if provider is not UNSET:
+            field_dict["provider"] = provider
+        if provider_name is not UNSET:
+            field_dict["provider_name"] = provider_name
+        if confidence is not UNSET:
+            field_dict["confidence"] = confidence
+        if last_seen is not UNSET:
+            field_dict["last_seen"] = last_seen
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        provider = d.pop("provider")
+        provider = d.pop("provider", UNSET)
 
-        provider_name = d.pop("provider_name")
+        provider_name = d.pop("provider_name", UNSET)
 
-        confidence = d.pop("confidence")
+        confidence = d.pop("confidence", UNSET)
 
-        last_seen = d.pop("last_seen")
+        last_seen = d.pop("last_seen", UNSET)
 
         class_detail = cls(
             provider=provider,

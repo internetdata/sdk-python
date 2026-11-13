@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="SatelliteDetail")
 
 
@@ -13,22 +15,22 @@ T = TypeVar("T", bound="SatelliteDetail")
 class SatelliteDetail:
     """
     Attributes:
-        provider (str): The operator's ID in Satellite IP Provider.
-        provider_name (str): The operator's name.
-        orbit (str): The orbit: `leo`, `meo` or `geo`.
-        segment (str): Who the space serves, such as consumer or maritime.
-        country (str): ISO 3166 country code.
-        asn (int): The AS the operator announces it from.
-        confidence (str): `high`, `medium` or `low`.
+        provider (str | Unset): The operator's ID in Satellite IP Provider.
+        provider_name (str | Unset): The operator's name.
+        orbit (str | Unset): The orbit: `leo`, `meo` or `geo`.
+        segment (str | Unset): Who the space serves, such as consumer or maritime.
+        country (str | Unset): ISO 3166 country code.
+        asn (int | Unset): The AS the operator announces it from.
+        confidence (str | Unset): `high`, `medium` or `low`.
     """
 
-    provider: str
-    provider_name: str
-    orbit: str
-    segment: str
-    country: str
-    asn: int
-    confidence: str
+    provider: str | Unset = UNSET
+    provider_name: str | Unset = UNSET
+    orbit: str | Unset = UNSET
+    segment: str | Unset = UNSET
+    country: str | Unset = UNSET
+    asn: int | Unset = UNSET
+    confidence: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,36 +50,40 @@ class SatelliteDetail:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "provider": provider,
-                "provider_name": provider_name,
-                "orbit": orbit,
-                "segment": segment,
-                "country": country,
-                "asn": asn,
-                "confidence": confidence,
-            }
-        )
+        field_dict.update({})
+        if provider is not UNSET:
+            field_dict["provider"] = provider
+        if provider_name is not UNSET:
+            field_dict["provider_name"] = provider_name
+        if orbit is not UNSET:
+            field_dict["orbit"] = orbit
+        if segment is not UNSET:
+            field_dict["segment"] = segment
+        if country is not UNSET:
+            field_dict["country"] = country
+        if asn is not UNSET:
+            field_dict["asn"] = asn
+        if confidence is not UNSET:
+            field_dict["confidence"] = confidence
 
         return field_dict
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         d = dict(src_dict)
-        provider = d.pop("provider")
+        provider = d.pop("provider", UNSET)
 
-        provider_name = d.pop("provider_name")
+        provider_name = d.pop("provider_name", UNSET)
 
-        orbit = d.pop("orbit")
+        orbit = d.pop("orbit", UNSET)
 
-        segment = d.pop("segment")
+        segment = d.pop("segment", UNSET)
 
-        country = d.pop("country")
+        country = d.pop("country", UNSET)
 
-        asn = d.pop("asn")
+        asn = d.pop("asn", UNSET)
 
-        confidence = d.pop("confidence")
+        confidence = d.pop("confidence", UNSET)
 
         satellite_detail = cls(
             provider=provider,
