@@ -11,9 +11,9 @@ rather than a bearer token), a different error vocabulary, and no `list`. Genera
 would ship dead modules and, worse, a second credential spelling that looks usable from
 this client and is not.
 
-Everything else is kept: the v2 database, IAM and OAuth, as the VPNDetection SDK generates
-them. IAM is generated and left unwrapped; the `oauth` accessor sends its own requests
-and never calls the generated authorization endpoints.
+Everything else is kept: the lookups, the entitlement, the v2 database, IAM and OAuth, as
+the VPNDetection SDK generates them. IAM is generated and left unwrapped; the `oauth`
+accessor sends its own requests and never calls the generated authorization endpoints.
 
 So the narrowing happens here rather than in the pinned copy. Unreferenced components go
 with the paths, or the generator emits models for v1 envelopes nothing can reach.
@@ -31,6 +31,12 @@ from ruamel.yaml import YAML
 
 KEEP_PATH_PREFIXES = (
     "/api/v2/",
+    "/{ip}",
+    "/myip",
+    "/asn/",
+    "/domain/",
+    "/batch",
+    "/api/v1/entitlement",
     "/api/v1/iam/",
     "/oauth/",
     "/.well-known/oauth-authorization-server",
