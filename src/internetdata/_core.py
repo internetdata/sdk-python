@@ -8,6 +8,7 @@ import base64
 import contextlib
 import contextvars
 import hashlib
+import ipaddress
 import json
 import math
 import os
@@ -259,6 +260,23 @@ def check_retries(retries: float) -> float:
     ):
         raise ValueError(f"retries must be a whole number from 0, or math.inf, not {retries!r}")
     return retries
+
+
+def check_address(ip: str) -> None:
+    """Refuse what is not an IP address before anything is sent. The API answers an AS
+    (`AS15169`) or a domain at the lookup's own path, and that answer is not a lookup's, so
+    sent, it came back as a retried `server_error` the caller could do nothing with."""
+    if isinstance(ip, str):
+        try:
+            ipaddress.ip_address(ip)
+            return
+        except ValueError:
+            pass
+    raise InternetDataError(
+        "bad_request",
+        f"{ip!r} is not an IP address: look an AS up with lookup_asn, and a domain with "
+        "lookup_domain",
+    )
 
 
 def call_retries(retries: float | None) -> float | None:

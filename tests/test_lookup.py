@@ -108,6 +108,39 @@ def test_a_bogon_lookup_issues_zero_http_requests(make_client: ClientFactory) ->
     assert stub.calls == []
 
 
+# The API answers an AS or a domain at the lookup's own path, with an answer a lookup cannot
+# read, so sending one ended as three retried server errors.
+@pytest.mark.parametrize(
+    "target", ["AS9009", "as9009", "9009", "example.com", "notanip", "", " 8.8.8.8", 9009, None]
+)
+def test_a_lookup_of_anything_but_an_address_is_refused_before_it_is_sent(
+    make_client: ClientFactory, target: Any
+) -> None:
+    stub = Lookups({})
+    client = make_client(transport=stub.transport, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        client.lookup(target)
+
+    assert (caught.value.kind, caught.value.retryable) == ("bad_request", False)
+    assert "lookup_asn" in str(caught.value) and "lookup_domain" in str(caught.value)
+    assert stub.calls == []
+
+
+def test_a_batch_sends_what_it_is_given_and_the_api_answers_for_it(
+    make_client: ClientFactory,
+) -> None:
+    stub = Lookups({"1.1.1.1": {"body": answer("1.1.1.1")}})
+    client = make_client(transport=stub.transport)
+
+    got = client.lookup_batch(["1.1.1.1", "AS9009"])
+
+    refused = got["AS9009"]
+    assert isinstance(refused, InternetDataError) and refused.kind == "bad_request"
+    assert isinstance(got["1.1.1.1"], Result)
+    assert len(stub.calls) == 1
+
+
 def test_a_served_answer_is_read_member_by_member(make_client: ClientFactory) -> None:
     stub = Lookups({"1.1.1.1": {"body": PAID}})
     client = make_client(transport=stub.transport)

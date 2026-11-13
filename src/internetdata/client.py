@@ -41,6 +41,7 @@ from ._core import (
     build_client,
     build_transfer_client,
     call_retries,
+    check_address,
     check_build,
     check_client_concurrency,
     check_concurrency,
@@ -190,7 +191,9 @@ class InternetData:
     ) -> Result:
         """What every database says about one address.
 
-        A bogon is answered locally and never reaches the network. Everything else is
+        A string that is not an IP address is refused as `bad_request` before anything is
+        sent: look an AS up with `lookup_asn`, and a domain with `lookup_domain`. A bogon is
+        answered locally and never reaches the network. Everything else is
         served, then cached for this instance. Calls that miss the cache while a request
         for their address is in flight, a batch's included, await that request rather than
         sending their own, and take its answer, sent under the options of the call that led
@@ -199,6 +202,7 @@ class InternetData:
         # Here as well as in _bound: a bogon or a cached answer returns before any request.
         check_timeout(timeout)
         call_retries(retries)
+        check_address(ip)
         ip = unmapped(ip)
         if is_bogon(ip):
             return bogon_result(ip)

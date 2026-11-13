@@ -168,7 +168,7 @@ domain = client.lookup_domain("example.com")
 print(domain.is_registered, domain.has_mx)   # True True
 ```
 
-On a paid plan an AS answer also carries its Whois record, its counts and every prefix it announces, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch.
+On a paid plan an AS answer also carries its Whois record, its counts and every prefix it announces, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch. `lookup` takes addresses alone, and refuses an AS or a domain with a `bad_request` before sending anything.
 
 ### Errors
 
