@@ -24,6 +24,7 @@ from helpers import (
     LIST_PATH,
     TESTDATA,
     ClientFactory,
+    LocalServer,
     Lookups,
     LoopBound,
     Meter,
@@ -139,6 +140,50 @@ def test_a_batch_sends_what_it_is_given_and_the_api_answers_for_it(
     assert isinstance(refused, InternetDataError) and refused.kind == "bad_request"
     assert isinstance(got["1.1.1.1"], Result)
     assert len(stub.calls) == 1
+
+
+class Origin(LocalServer):
+    """Answers every lookup from a real socket, so the base URL the client was built with is
+    the only place a request can be answered."""
+
+    def answer(self, conn: Any, path: str) -> None:
+        bodies: dict[str, Any] = {
+            "/1.1.1.1": answer("1.1.1.1"),
+            "/asn/9009": ASN,
+            "/domain/example.com": DOMAIN,
+            "/myip": answer("146.70.116.130"),
+            "/api/v1/entitlement": ENTITLEMENT,
+            "/batch": {"results": {"1.1.1.1": answer("1.1.1.1")}, "errors": {}},
+        }
+        body = json.dumps(bodies[path]).encode()
+        conn.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode()
+            + body
+        )
+
+
+# The spec gives each lookup path a server of its own; a client honoring it would send every
+# lookup to production whatever base URL it was built with.
+def test_every_lookup_goes_to_the_clients_base_url(make_client: ClientFactory) -> None:
+    with Origin() as server:
+        client = make_client(base_url=server.url, cache=False, retries=0)
+        client.lookup("1.1.1.1")
+        client.lookup_asn(9009)
+        client.lookup_domain("example.com")
+        client.my_ip()
+        client.my_entitlement()
+        batch = client.lookup_batch(["1.1.1.1"])
+
+    assert isinstance(batch["1.1.1.1"], Result)
+    assert server.paths == [
+        "/1.1.1.1",
+        "/asn/9009",
+        "/domain/example.com",
+        "/myip",
+        "/api/v1/entitlement",
+        "/batch",
+    ]
 
 
 def test_a_served_answer_is_read_member_by_member(make_client: ClientFactory) -> None:
