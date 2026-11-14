@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.12.0 - 2026-11-14
+
+### Features
+
+- Add the framework middleware core ([`5ccfa93`](https://github.com/internetdata/sdk-python/commit/5ccfa939c8435a4dba6af3bd1710dc49b9d9a77c))
+
 ## 2.11.0 - 2026-11-13
 
 ### Features
