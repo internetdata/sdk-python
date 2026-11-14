@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.12.1 - 2026-11-14
+
+### Fixes
+
+- Re-pin the spec to 2026.11.13 as republished: the ip.lookup scope 403 ([`99e7319`](https://github.com/internetdata/sdk-python/commit/99e7319154c0b36f94571cba4d540464ba46f09d))
+
 ## 2.12.0 - 2026-11-14
 
 ### Features
