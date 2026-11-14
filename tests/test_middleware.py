@@ -1,0 +1,392 @@
+"""The middleware half of the shared conformance corpus, plus the Python-specific
+parts of it.
+
+The corpus is language-neutral JSON and this SDK's `Result` already uses the wire's
+own names, so a condition needs no translation here at all, a path such as
+``location.city`` included.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import http.server
+import json
+import threading
+import time
+from typing import Any, Self
+
+import pytest
+from helpers import TESTDATA, Lookups, SlowBody
+
+from internetdata import AsyncInternetData, InternetData, InternetDataError
+from internetdata.middleware import (
+    AsyncCore,
+    Core,
+    Guard,
+    Lookup,
+    Options,
+    RequestView,
+    Selectors,
+    bind_selectors,
+    matches,
+    missing_members,
+)
+from internetdata.models import Result, to_result
+
+MIDDLEWARE = TESTDATA["middleware"]
+# Served answers from the lookup corpus: Unlimited's, and a paid plan's.
+ANSWERS: dict[str, dict[str, Any]] = {case["name"]: case["body"] for case in TESTDATA["lookup"]}
+UNLIMITED = ANSWERS["unlimited-answer"]
+PAID = ANSWERS["paid-full-shape"]
+PUBLIC_IP = PAID["ip"]
+
+
+def _result_for(case: dict[str, Any]) -> Result:
+    if "bogon" in case:
+        # Answered locally, so this needs no transport and pins the synthesized shape
+        # rather than a fixture's idea of it.
+        return InternetData().lookup(case["bogon"])
+    return to_result(case["body"])
+
+
+@pytest.mark.parametrize("case", MIDDLEWARE["conditions"], ids=lambda c: c["name"])
+def test_corpus_conditions(case: dict[str, Any]) -> None:
+    result = _result_for(case)
+    assert matches(case["condition"], result) is case["expect"]["blocked"], case["why"]
+    assert sorted(missing_members(case["condition"], result)) == sorted(
+        case["expect"]["missing"]
+    ), case["why"]
+
+
+@pytest.mark.parametrize("case", MIDDLEWARE["invalidConditions"], ids=lambda c: c["name"])
+def test_corpus_refuses_a_condition_that_constrains_nothing(case: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="constrains nothing"):
+        Core(Options(block_condition=case["condition"]), lambda _: PUBLIC_IP)
+
+
+class Req:
+    """The least a framework can offer, so the core is exercised without one."""
+
+    def __init__(self, headers: dict[str, str] | None = None, ip: str = PUBLIC_IP) -> None:
+        self.headers = {name.lower(): value for name, value in (headers or {}).items()}
+        self.ip = ip
+
+
+SELECTORS: Selectors[Req] = bind_selectors(
+    lambda request: RequestView(
+        header=lambda name: request.headers.get(name.lower()),
+        framework_ip=lambda: request.ip,
+    )
+)
+
+
+def _core(**options: Any) -> Core[Req]:
+    return Core(Options(**options), SELECTORS.default)
+
+
+def _serving(body: dict[str, Any], *, status: int = 200) -> InternetData:
+    stub = Lookups({body.get("ip", PUBLIC_IP): {"body": body, "status": status}})
+    return InternetData(cache=False, retries=0, transport=stub.transport)
+
+
+def test_enriches_without_blocking_when_no_condition_is_configured() -> None:
+    core = _core(client=_serving(UNLIMITED))
+    lookup = core.evaluate(Req())
+    assert lookup is not None
+    assert lookup.blocked is False
+    assert lookup.result is not None
+    assert lookup.result.location.country == "AT"
+    assert lookup.result.asn.asn == 9009
+    assert lookup.result.is_vpn is None, "Unlimited leaves is_vpn out, and absent is not false"
+    assert lookup.ip == PUBLIC_IP
+
+
+def test_a_country_condition_blocks_without_a_key_and_another_country_passes() -> None:
+    blocking = _core(
+        client=_serving(UNLIMITED), block_condition={"location": {"country": ["DE", "AT"]}}
+    )
+    lookup = blocking.evaluate(Req())
+    assert lookup is not None and lookup.blocked is True
+
+    passing = _core(client=_serving(UNLIMITED), block_condition={"location": {"country": "DE"}})
+    lookup = passing.evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
+
+
+def test_a_network_type_condition_blocks_on_every_plan() -> None:
+    hosting = _core(client=_serving(UNLIMITED), block_condition={"asn": {"type": "hosting"}})
+    lookup = hosting.evaluate(Req())
+    assert lookup is not None and lookup.blocked is True
+
+    servers = _core(client=_serving(PAID), block_condition=[{"is_hosting": True}, {"is_cdn": True}])
+    lookup = servers.evaluate(Req())
+    assert lookup is not None and lookup.blocked is True
+
+
+def test_skip_claims_the_request() -> None:
+    core = _core(client=_serving(UNLIMITED), skip=lambda _: True)
+    assert core.evaluate(Req()) is None
+
+
+def test_fails_open_on_a_lookup_error_and_closed_only_when_asked() -> None:
+    failing = _serving({"ip": PUBLIC_IP, "error": "boom"}, status=500)
+    opened = _core(client=failing, block_condition={"is_vpn": True})
+    lookup = opened.evaluate(Req())
+    assert lookup is not None
+    assert lookup.blocked is False
+    assert isinstance(lookup.error, InternetDataError)
+    assert lookup.result is None
+
+    closed = _core(client=failing, block_condition={"is_vpn": True}, fail_closed=True)
+    shut = closed.evaluate(Req())
+    assert shut is not None and shut.blocked is True
+
+
+def test_a_private_client_address_warns_once_and_never_reaches_the_network() -> None:
+    warnings: list[str] = []
+    core = _core(
+        client=_serving({**PAID, "ip": "10.0.0.7"}),
+        block_condition={"is_vpn": True},
+        on_warn=warnings.append,
+    )
+    for _ in range(2):
+        lookup = core.evaluate(Req(ip="10.0.0.7"))
+        assert lookup is not None
+        assert lookup.blocked is False
+        assert lookup.result is not None and lookup.result.is_bogon is True
+    assert len(warnings) == 1, "a per-request warning is an outage of its own"
+    assert "not a public address" in warnings[0]
+
+
+def test_a_missing_member_warns_once_or_raises_on_request() -> None:
+    free = _serving(UNLIMITED)
+    warnings: list[str] = []
+    warned = _core(client=free, block_condition={"is_hosting": True}, on_warn=warnings.append)
+    assert warned.evaluate(Req()) is not None
+    warned.evaluate(Req())
+    assert len(warnings) == 1
+    assert "is_hosting" in warnings[0]
+
+    strict = _core(client=free, block_condition={"is_hosting": True}, on_missing_field="raise")
+    with pytest.raises(ValueError, match="does not include"):
+        strict.evaluate(Req())
+
+    def fail(_: str) -> None:
+        raise AssertionError("ignore must not warn")
+
+    quiet = _core(
+        client=free,
+        block_condition={"is_hosting": True},
+        on_missing_field="ignore",
+        on_warn=fail,
+    )
+    assert quiet.evaluate(Req()) is not None
+
+
+def test_a_paid_member_inside_a_shared_object_is_reported_by_its_path() -> None:
+    warnings: list[str] = []
+    core = _core(
+        client=_serving(UNLIMITED),
+        block_condition={"location": {"city": "Vienna"}},
+        on_warn=warnings.append,
+    )
+    lookup = core.evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
+    assert len(warnings) == 1
+    assert warnings[0].startswith("block_condition names location.city,")
+
+
+def test_selectors_read_what_they_say_they_read() -> None:
+    request = Req({"X-Forwarded-For": "203.0.113.9, 70.41.3.18, 150.172.238.178"}, ip="10.0.0.1")
+    assert SELECTORS.default(request) == "10.0.0.1"
+    assert SELECTORS.xff()(request) == "203.0.113.9"
+    assert SELECTORS.xff(1)(request) == "150.172.238.178"
+    assert SELECTORS.xff(2)(request) == "70.41.3.18"
+    assert SELECTORS.header("CF-Connecting-IP")(request) == "10.0.0.1"
+
+    cloudflared = Req({"CF-Connecting-IP": "198.51.100.4"}, ip="10.0.0.1")
+    assert SELECTORS.header("CF-Connecting-IP")(cloudflared) == "198.51.100.4"
+    assert SELECTORS.xff()(Req({}, ip="10.0.0.1")) == "10.0.0.1"
+
+
+def test_an_unresolvable_address_warns_and_does_not_block() -> None:
+    warnings: list[str] = []
+    core: Core[Req] = Core(
+        Options(block_condition={"is_vpn": True}, on_warn=warnings.append),
+        lambda _: None,
+    )
+    lookup = core.evaluate(Req())
+    assert lookup is not None
+    assert lookup.blocked is False
+    assert isinstance(lookup.error, InternetDataError)
+    assert "could not resolve a client address" in warnings[0]
+
+
+def test_an_injected_client_is_used_rather_than_a_second_one_built() -> None:
+    shared = InternetData(transport=Lookups({PUBLIC_IP: {"body": UNLIMITED}}).transport)
+    core = _core(client=shared)
+    assert core.evaluate(Req()) is not None
+    # The second call must come from the shared cache, which is only observable
+    # because it is the SAME client the caller still holds.
+    assert shared.lookup(PUBLIC_IP).location.country == "AT"
+
+
+class _KeyServer:
+    """A local API that answers every lookup and records the Authorization each one carried."""
+
+    def __init__(self) -> None:
+        self.authorizations: list[str | None] = []
+        recorded = self.authorizations
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                recorded.append(self.headers.get("Authorization"))
+                body = json.dumps(UNLIMITED).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_: Any) -> None:
+                pass
+
+        self._server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self._server.server_address[1]}"
+
+    def __enter__(self) -> Self:
+        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+
+@pytest.mark.parametrize("flavor", ["sync", "async"])
+def test_a_core_built_from_a_key_sends_that_key(flavor: str) -> None:
+    """Every other middleware test hands the core a client, so a core that built its own
+    without the key it was given passed them all."""
+    with _KeyServer() as server:
+        options: Options[Req] = Options(api_key="k_middleware", base_url=server.url)
+        if flavor == "sync":
+            lookup = Core(options, SELECTORS.default).evaluate(Req())
+        else:
+
+            async def evaluate() -> Lookup | None:
+                return await AsyncCore(options, SELECTORS.default).evaluate(Req())
+
+            lookup = asyncio.run(evaluate())
+
+    assert lookup is not None and lookup.error is None, lookup
+    assert lookup.result is not None and lookup.result.location.country == "AT"
+    assert server.authorizations == ["Bearer k_middleware"]
+
+
+def test_the_timeout_bounds_a_lookup_through_a_client_passed_in() -> None:
+    with (
+        SlowBody(None) as stall,
+        InternetData(base_url=stall.url, timeout=5.0, retries=0) as client,
+    ):
+        core = _core(client=client, timeout=0.2)
+        started = time.monotonic()
+        lookup = core.evaluate(Req())
+        elapsed = time.monotonic() - started
+
+    assert lookup is not None and lookup.blocked is False
+    assert isinstance(lookup.error, InternetDataError) and lookup.error.kind == "network"
+    assert elapsed < 2.5, f"the lookup held the request for {elapsed:.2f}s"
+
+
+def test_the_timeout_bounds_a_lookup_through_an_async_client_passed_in() -> None:
+    async def evaluate(url: str) -> Lookup | None:
+        async with AsyncInternetData(base_url=url, timeout=5.0, retries=0) as client:
+            core: AsyncCore[Req] = AsyncCore(Options(client=client, timeout=0.2), SELECTORS.default)
+            return await core.evaluate(Req())
+
+    with SlowBody(None) as stall:
+        started = time.monotonic()
+        lookup = asyncio.run(evaluate(stall.url))
+        elapsed = time.monotonic() - started
+
+    assert lookup is not None and lookup.blocked is False
+    assert isinstance(lookup.error, InternetDataError) and lookup.error.kind == "network"
+    assert elapsed < 2.5, f"the lookup held the request for {elapsed:.2f}s"
+
+
+def test_an_async_client_is_refused_by_the_sync_core() -> None:
+    with pytest.raises(TypeError, match="use AsyncCore"):
+        Core(Options(client=AsyncInternetData()), SELECTORS.default)
+
+
+def test_a_sync_client_is_refused_by_the_async_core() -> None:
+    with pytest.raises(TypeError, match="use Core"):
+        AsyncCore(Options(client=InternetData()), SELECTORS.default)
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), "30", True])
+def test_a_timeout_no_lookup_can_meet_is_refused_when_the_middleware_is_built(
+    timeout: Any,
+) -> None:
+    """Otherwise every lookup fails, and the middleware fails open on every request."""
+    with pytest.raises(ValueError, match="timeout"):
+        Core(Options(timeout=timeout), SELECTORS.default)
+    with pytest.raises(ValueError, match="timeout"):
+        AsyncCore(Options(timeout=timeout), SELECTORS.default)
+
+
+# A per-view check judges the answer the middleware attached, so it must reach the
+# same verdict and the same plan-gap warning as the middleware's own condition, without
+# a request of its own.
+@pytest.mark.parametrize("case", MIDDLEWARE["conditions"], ids=lambda c: c["name"])
+def test_corpus_conditions_through_a_guard(case: dict[str, Any]) -> None:
+    warnings: list[str] = []
+    guard = Guard(case["condition"], on_warn=warnings.append)
+    found = Lookup(blocked=False, ip=PUBLIC_IP, result=_result_for(case))
+    assert guard.blocks(found) is case["expect"]["blocked"], case["why"]
+    assert len(warnings) == (1 if case["expect"]["missing"] else 0), case["why"]
+    for member in case["expect"]["missing"]:
+        assert member in warnings[0], case["why"]
+
+
+@pytest.mark.parametrize("case", MIDDLEWARE["invalidConditions"], ids=lambda c: c["name"])
+def test_a_guard_refuses_a_condition_that_constrains_nothing(case: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="constrains nothing"):
+        Guard(case["condition"])
+
+
+def test_a_guard_needs_a_condition() -> None:
+    with pytest.raises(ValueError, match="needs a condition"):
+        Guard(None)  # type: ignore[arg-type]
+
+
+def test_a_guard_passes_a_failed_lookup_unless_it_fails_closed() -> None:
+    failed = Lookup(blocked=False, ip=PUBLIC_IP, error=InternetDataError("network", "down"))
+    assert Guard({"is_vpn": True}).blocks(failed) is False
+    assert Guard({"is_vpn": True}, fail_closed=True).blocks(failed) is True
+
+
+def test_a_guard_warns_once_by_its_name_or_raises() -> None:
+    found = Lookup(blocked=False, ip=PUBLIC_IP, result=to_result(UNLIMITED))
+    warnings: list[str] = []
+    guard = Guard({"is_hosting": True}, on_warn=warnings.append, name="block_if on checkout")
+    assert guard.blocks(found) is False
+    assert guard.blocks(found) is False
+    assert len(warnings) == 1
+    assert warnings[0].startswith("block_if on checkout names is_hosting")
+
+    with pytest.raises(ValueError, match="does not include"):
+        Guard({"is_hosting": True}, on_missing_field="raise").blocks(found)
+
+    def fail(_: str) -> None:
+        raise AssertionError("ignore must not warn")
+
+    quiet = Guard({"is_hosting": True}, on_missing_field="ignore", on_warn=fail)
+    assert quiet.blocks(found) is False
+
+
+def test_a_guard_warns_through_the_logger_by_default(caplog: pytest.LogCaptureFixture) -> None:
+    found = Lookup(blocked=False, ip=PUBLIC_IP, result=to_result(UNLIMITED))
+    with caplog.at_level("WARNING", logger="internetdata"):
+        Guard({"is_hosting": True}).blocks(found)
+    assert ["block condition names is_hosting" in r.message for r in caplog.records] == [True]
