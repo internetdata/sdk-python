@@ -652,9 +652,12 @@ class Rwhois:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class HostedDomains:
-    """From IP Hosted Domains: how many registered domains resolve to the address."""
+    """From IP Hosted Domains: how many registered domains resolve to the address, and the
+    10 most popular."""
 
     total: int
+    #: Up to 10 of them, the most popular first; empty when none does.
+    domains: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

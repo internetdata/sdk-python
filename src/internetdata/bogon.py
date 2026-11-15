@@ -68,7 +68,7 @@ def bogon_result(ip: str) -> Result:
     """The answer a bogon gets, in the shape the API answers one on a paid plan: every
     flag present and false, every detail object present and empty (Web IP's list empty),
     `location`, `asn`, `company`, `abuse`, `whois` and `rwhois` with every field empty,
-    `hostname` empty, `hosted_domains` 0, and `is_bogon` true.
+    `hostname` empty, `hosted_domains` 0 with no domains, and `is_bogon` true.
 
     Note this is deliberately that WIDEST shape regardless of your plan, so do not infer
     which fields your plan includes from a bogon answer.
@@ -156,7 +156,7 @@ def bogon_result(ip: str) -> Result:
             asn=0,
         ),
         rwhois=Rwhois(id="", name="", country="", source="", domain="", abuse_email=""),
-        hosted_domains=HostedDomains(total=0),
+        hosted_domains=HostedDomains(total=0, domains=()),
         raw={},
     )
 

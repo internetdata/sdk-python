@@ -81,8 +81,8 @@ class LookupResponse:
         bittorrent (BitTorrentDetail | Unset):
         whois (Whois | Unset): IP Whois's most specific record covering the address. Paid plans and the trial.
         rwhois (Rwhois | Unset): IP RWHOIS's most specific network covering the address. Paid plans and the trial.
-        hosted_domains (HostedDomains | Unset): From IP Hosted Domains: a count, never the list. Paid plans and the
-            trial.
+        hosted_domains (HostedDomains | Unset): From IP Hosted Domains: how many registered domains resolve to the
+            address, and the 10 most popular. Its database lists up to 1,000 an address. Paid plans and the trial.
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
             day's trial of every field lasts, `true` once the answer has Unlimited's fields.
     """
