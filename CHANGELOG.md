@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.13.0 - 2026-11-15
+
+### Features
+
+- Read hosted_domains' 10 most popular domains ([`0bcedfc`](https://github.com/internetdata/sdk-python/commit/0bcedfce8ddcd4a9e48b52c6a7d3f8f6a9fb959e))
+
 ## 2.12.1 - 2026-11-14
 
 ### Fixes
