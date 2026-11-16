@@ -587,8 +587,8 @@ class DatabaseApi:
         The API answers `302` to object storage, and the link carries its own signature,
         so it holds no API key and can be handed to anything that speaks HTTP. Returned
         rather than followed so the caller decides how to move a file that reaches
-        gigabytes; the link authorizes the START of a transfer, so one already running is
-        not interrupted when it lapses.
+        gigabytes. The link only has to be valid when a transfer starts, so one already
+        running isn't cut off when it lapses.
 
         `build` names one build of the database, as a `database.updated` webhook gives it
         (`20261105.0t53s5`), so the file is the one whose `sha256` the webhook carries.

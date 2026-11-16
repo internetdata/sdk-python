@@ -26,6 +26,7 @@ __all__ = [
     "STANDINGS",
     "AbuseContact",
     "Asn",
+    "AsnHostedDomains",
     "AsnPrefix",
     "AsnResult",
     "BitTorrentDetail",
@@ -753,6 +754,16 @@ class AsnPrefix:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class AsnHostedDomains:
+    """From ASN Hosted Domains: how many registered domains the AS hosts, and the 10 most
+    popular."""
+
+    total: int
+    #: Up to 10 of them, the most popular first; empty when none does.
+    domains: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class AsnResult:
     """What an AS lookup answers: its registration on every plan, and on a paid one its
     ASN Whois record, its counts and every prefix it announces. None is "not in your plan",
@@ -773,6 +784,20 @@ class AsnResult:
     rpki_not_found: int | None = None
     whois: dict[str, str] | None = None
     prefixes: tuple[AsnPrefix, ...] | None = None
+    #: Its rank in ASN Extended by customer cone, 1 the largest; 0 for an AS seen in no AS path.
+    rank: int | None = None
+    #: Whether it is one of the transit-free networks at the top of the hierarchy.
+    tier1: bool | None = None
+    num_upstreams: int | None = None
+    #: The AS numbers it gets transit from, ascending, up to 20000.
+    upstreams: tuple[int, ...] | None = None
+    num_peers: int | None = None
+    #: The AS numbers it exchanges its own and its customers' routes with, up to 20000.
+    peers: tuple[int, ...] | None = None
+    num_downstreams: int | None = None
+    #: The AS numbers it provides transit to, ascending, up to 20000.
+    downstreams: tuple[int, ...] | None = None
+    hosted_domains: AsnHostedDomains | None = None
     trial_expired: bool | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -887,6 +912,9 @@ class EntitlementPlan:
     """The plan the key's organization is on."""
 
     key: str
+    #: The plan's name as the site and console show it, `Unlimited` for `free`. Show this,
+    #: and compare against `key`, which is never renamed.
+    name: str
     tier: EntitlementPlanTier
 
 

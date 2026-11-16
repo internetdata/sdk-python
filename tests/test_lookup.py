@@ -67,7 +67,7 @@ ENTITLEMENT: dict[str, Any] = {
         "expires": None,
         "allowed_cidrs": [],
     },
-    "plan": {"key": "max", "tier": "max"},
+    "plan": {"key": "max", "name": "Max", "tier": "max"},
     "usage": {
         "requests": 580,
         "quota": 5000000,
@@ -643,11 +643,27 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     ),
     "the entitlement's tier a number": (
         "my_entitlement",
-        {**ENTITLEMENT, "plan": {"key": "max", "tier": 1}},
+        {**ENTITLEMENT, "plan": {"key": "max", "name": "Max", "tier": 1}},
+    ),
+    "the entitlement's plan name a number": (
+        "my_entitlement",
+        {**ENTITLEMENT, "plan": {"key": "max", "name": 1, "tier": "max"}},
+    ),
+    "the entitlement's plan name missing": (
+        "my_entitlement",
+        {**ENTITLEMENT, "plan": {"key": "max", "tier": "max"}},
+    ),
+    "the AS rank a numeric string": ("lookup_asn", {**ASN, "rank": "341"}),
+    "the AS tier1 a string": ("lookup_asn", {**ASN, "tier1": "false"}),
+    "the AS upstreams holding a string": ("lookup_asn", {**ASN, "upstreams": ["174"]}),
+    "the AS downstreams holding null": ("lookup_asn", {**ASN, "downstreams": [None]}),
+    "the AS hosted_domains without total": (
+        "lookup_asn",
+        {**ASN, "hosted_domains": {"domains": []}},
     ),
     "the entitlement's tier unknown": (
         "my_entitlement",
-        {**ENTITLEMENT, "plan": {"key": "max", "tier": "platinum"}},
+        {**ENTITLEMENT, "plan": {"key": "max", "name": "Max", "tier": "platinum"}},
     ),
     "the entitlement's org_id not a UUID": ("my_entitlement", {**ENTITLEMENT, "org_id": "x"}),
     "the entitlement's window_start not RFC 3339": (

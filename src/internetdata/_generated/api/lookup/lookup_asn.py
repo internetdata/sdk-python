@@ -83,11 +83,11 @@ def sync_detailed(
     """ASN lookup
 
      Answers what InternetData knows about one autonomous system: its registration on every plan,
-    and on a paid one its ASN Whois record and every prefix it announces in global BGP, with RPKI
-    status,
-    up to 20000 per address family (the counts beside them are always whole). An AS no database knows
-    answers
-    its number with empty values.
+    and on a paid one its ASN Whois record, every prefix it announces in global BGP, with RPKI status,
+    up to 20000 per address family, its rank, Tier 1 flag, upstreams, peers and downstreams from ASN
+    Extended, up to 20000 each (the counts beside them are always whole), and the domains it hosts. An
+    AS no
+    database knows answers its number with empty values.
 
     Args:
         asn (str):
@@ -119,11 +119,11 @@ def sync(
     """ASN lookup
 
      Answers what InternetData knows about one autonomous system: its registration on every plan,
-    and on a paid one its ASN Whois record and every prefix it announces in global BGP, with RPKI
-    status,
-    up to 20000 per address family (the counts beside them are always whole). An AS no database knows
-    answers
-    its number with empty values.
+    and on a paid one its ASN Whois record, every prefix it announces in global BGP, with RPKI status,
+    up to 20000 per address family, its rank, Tier 1 flag, upstreams, peers and downstreams from ASN
+    Extended, up to 20000 each (the counts beside them are always whole), and the domains it hosts. An
+    AS no
+    database knows answers its number with empty values.
 
     Args:
         asn (str):
@@ -150,11 +150,11 @@ async def asyncio_detailed(
     """ASN lookup
 
      Answers what InternetData knows about one autonomous system: its registration on every plan,
-    and on a paid one its ASN Whois record and every prefix it announces in global BGP, with RPKI
-    status,
-    up to 20000 per address family (the counts beside them are always whole). An AS no database knows
-    answers
-    its number with empty values.
+    and on a paid one its ASN Whois record, every prefix it announces in global BGP, with RPKI status,
+    up to 20000 per address family, its rank, Tier 1 flag, upstreams, peers and downstreams from ASN
+    Extended, up to 20000 each (the counts beside them are always whole), and the domains it hosts. An
+    AS no
+    database knows answers its number with empty values.
 
     Args:
         asn (str):
@@ -184,11 +184,11 @@ async def asyncio(
     """ASN lookup
 
      Answers what InternetData knows about one autonomous system: its registration on every plan,
-    and on a paid one its ASN Whois record and every prefix it announces in global BGP, with RPKI
-    status,
-    up to 20000 per address family (the counts beside them are always whole). An AS no database knows
-    answers
-    its number with empty values.
+    and on a paid one its ASN Whois record, every prefix it announces in global BGP, with RPKI status,
+    up to 20000 per address family, its rank, Tier 1 flag, upstreams, peers and downstreams from ASN
+    Extended, up to 20000 each (the counts beside them are always whole), and the domains it hosts. An
+    AS no
+    database knows answers its number with empty values.
 
     Args:
         asn (str):

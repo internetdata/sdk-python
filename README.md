@@ -82,6 +82,7 @@ Same answer `lookup` would give for that address, and the same cost against your
 ```python
 acct = client.my_entitlement()
 print(acct.plan.key)          # starter
+print(acct.plan.name)         # Starter, the name to show
 print(acct.usage.requests)    # 580
 print(acct.usage.window_end)  # when the allowance resets
 ```
@@ -168,7 +169,7 @@ domain = client.lookup_domain("example.com")
 print(domain.is_registered, domain.has_mx)   # True True
 ```
 
-On a paid plan an AS answer also carries its Whois record, its counts and every prefix it announces, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch. `lookup` takes addresses alone, and refuses an AS or a domain with a `bad_request` before sending anything.
+On a paid plan an AS answer also carries its Whois record, its counts, every prefix it announces, its rank, Tier 1 flag, upstreams, peers and downstreams, and the domains it hosts, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch. `lookup` takes addresses alone, and refuses an AS or a domain with a `bad_request` before sending anything.
 
 ### Errors
 
@@ -255,7 +256,7 @@ raw = client.database.download_bytes("bogon_ip_v1", "csvgz")
 written = client.database.download("bogon_ip_v1", "mmdb", "./bogon_ip_v1.mmdb")
 ```
 
-`download_url` hands back a time-limited link straight to object storage. It carries its own signature and none of your API key, so you can pass it to `curl`, a job runner or anything else that speaks HTTP. The link authorizes the START of a transfer, so one already running is not cut off when it lapses.
+`download_url` hands back a time-limited link straight to object storage. It carries its own signature and none of your API key, so you can pass it to `curl`, a job runner or anything else that speaks HTTP. The link only has to be valid when a transfer starts, so one already running isn't cut off when it lapses.
 
 `download` streams to a file, so nothing larger than a chunk is ever held in memory. The bytes land in a neighboring `.part` file that is moved into place only once the whole transfer has arrived, so a failed refresh leaves the copy you already had untouched. `download_bytes` holds the whole file in memory, so reach for it only at the small end of the catalog.
 

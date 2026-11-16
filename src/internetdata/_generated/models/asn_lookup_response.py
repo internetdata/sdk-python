@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.asn_hosted_domains import AsnHostedDomains
     from ..models.asn_lookup_response_whois import AsnLookupResponseWhois
     from ..models.asn_prefix import AsnPrefix
 
@@ -38,6 +39,19 @@ class AsnLookupResponse:
             nothing. Paid plans and the trial.
         prefixes (list[AsnPrefix] | Unset): What it announces, IPv4 then IPv6, up to 20000 a family. Paid plans and the
             trial.
+        rank (int | Unset): Its rank in ASN Extended, by customer cone, 1 the largest; `0` for an AS seen in no AS path.
+            Paid plans and the trial.
+        tier1 (bool | Unset): Whether it is one of the transit-free networks at the top of the hierarchy, which get
+            transit from no one and peer with each other. Paid plans and the trial.
+        num_upstreams (int | Unset): How many AS numbers it gets transit from. Paid plans and the trial.
+        upstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
+        num_peers (int | Unset): How many AS numbers it exchanges its own and its customers' routes with. Paid plans and
+            the trial.
+        peers (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
+        num_downstreams (int | Unset): How many AS numbers it provides transit to. Paid plans and the trial.
+        downstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
+        hosted_domains (AsnHostedDomains | Unset): From ASN Hosted Domains: how many registered domains the AS hosts,
+            and the 10 most popular. Its database lists up to 1,000 an AS. Paid plans and the trial.
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
             day's trial of every field lasts, `true` once the answer has Unlimited's fields.
     """
@@ -57,6 +71,15 @@ class AsnLookupResponse:
     rpki_not_found: int | Unset = UNSET
     whois: AsnLookupResponseWhois | Unset = UNSET
     prefixes: list[AsnPrefix] | Unset = UNSET
+    rank: int | Unset = UNSET
+    tier1: bool | Unset = UNSET
+    num_upstreams: int | Unset = UNSET
+    upstreams: list[int] | Unset = UNSET
+    num_peers: int | Unset = UNSET
+    peers: list[int] | Unset = UNSET
+    num_downstreams: int | Unset = UNSET
+    downstreams: list[int] | Unset = UNSET
+    hosted_domains: AsnHostedDomains | Unset = UNSET
     trial_expired: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -98,6 +121,32 @@ class AsnLookupResponse:
                 prefixes_item = prefixes_item_data.to_dict()
                 prefixes.append(prefixes_item)
 
+        rank = self.rank
+
+        tier1 = self.tier1
+
+        num_upstreams = self.num_upstreams
+
+        upstreams: list[int] | Unset = UNSET
+        if not isinstance(self.upstreams, Unset):
+            upstreams = self.upstreams
+
+        num_peers = self.num_peers
+
+        peers: list[int] | Unset = UNSET
+        if not isinstance(self.peers, Unset):
+            peers = self.peers
+
+        num_downstreams = self.num_downstreams
+
+        downstreams: list[int] | Unset = UNSET
+        if not isinstance(self.downstreams, Unset):
+            downstreams = self.downstreams
+
+        hosted_domains: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.hosted_domains, Unset):
+            hosted_domains = self.hosted_domains.to_dict()
+
         trial_expired = self.trial_expired
 
         field_dict: dict[str, Any] = {}
@@ -130,6 +179,24 @@ class AsnLookupResponse:
             field_dict["whois"] = whois
         if prefixes is not UNSET:
             field_dict["prefixes"] = prefixes
+        if rank is not UNSET:
+            field_dict["rank"] = rank
+        if tier1 is not UNSET:
+            field_dict["tier1"] = tier1
+        if num_upstreams is not UNSET:
+            field_dict["num_upstreams"] = num_upstreams
+        if upstreams is not UNSET:
+            field_dict["upstreams"] = upstreams
+        if num_peers is not UNSET:
+            field_dict["num_peers"] = num_peers
+        if peers is not UNSET:
+            field_dict["peers"] = peers
+        if num_downstreams is not UNSET:
+            field_dict["num_downstreams"] = num_downstreams
+        if downstreams is not UNSET:
+            field_dict["downstreams"] = downstreams
+        if hosted_domains is not UNSET:
+            field_dict["hosted_domains"] = hosted_domains
         if trial_expired is not UNSET:
             field_dict["trial_expired"] = trial_expired
 
@@ -137,6 +204,7 @@ class AsnLookupResponse:
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        from ..models.asn_hosted_domains import AsnHostedDomains
         from ..models.asn_lookup_response_whois import AsnLookupResponseWhois
         from ..models.asn_prefix import AsnPrefix
 
@@ -183,6 +251,29 @@ class AsnLookupResponse:
 
                 prefixes.append(prefixes_item)
 
+        rank = d.pop("rank", UNSET)
+
+        tier1 = d.pop("tier1", UNSET)
+
+        num_upstreams = d.pop("num_upstreams", UNSET)
+
+        upstreams = cast(list[int], d.pop("upstreams", UNSET))
+
+        num_peers = d.pop("num_peers", UNSET)
+
+        peers = cast(list[int], d.pop("peers", UNSET))
+
+        num_downstreams = d.pop("num_downstreams", UNSET)
+
+        downstreams = cast(list[int], d.pop("downstreams", UNSET))
+
+        _hosted_domains = d.pop("hosted_domains", UNSET)
+        hosted_domains: AsnHostedDomains | Unset
+        if isinstance(_hosted_domains, Unset):
+            hosted_domains = UNSET
+        else:
+            hosted_domains = AsnHostedDomains.from_dict(_hosted_domains)
+
         trial_expired = d.pop("trial_expired", UNSET)
 
         asn_lookup_response = cls(
@@ -201,6 +292,15 @@ class AsnLookupResponse:
             rpki_not_found=rpki_not_found,
             whois=whois,
             prefixes=prefixes,
+            rank=rank,
+            tier1=tier1,
+            num_upstreams=num_upstreams,
+            upstreams=upstreams,
+            num_peers=num_peers,
+            peers=peers,
+            num_downstreams=num_downstreams,
+            downstreams=downstreams,
+            hosted_domains=hosted_domains,
             trial_expired=trial_expired,
         )
 

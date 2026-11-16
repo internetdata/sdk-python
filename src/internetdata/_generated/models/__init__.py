@@ -12,6 +12,7 @@ from .account_user import AccountUser
 from .apikey_detail import ApikeyDetail
 from .apikey_list import ApikeyList
 from .asn import Asn
+from .asn_hosted_domains import AsnHostedDomains
 from .asn_lookup_response import AsnLookupResponse
 from .asn_lookup_response_whois import AsnLookupResponseWhois
 from .asn_prefix import AsnPrefix
@@ -102,6 +103,7 @@ __all__ = (
     "ApikeyDetail",
     "ApikeyList",
     "Asn",
+    "AsnHostedDomains",
     "AsnLookupResponse",
     "AsnLookupResponseWhois",
     "AsnPrefix",
