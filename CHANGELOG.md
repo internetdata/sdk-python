@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.14.0 - 2026-11-16
+
+### Features
+
+- Read an AS's rank, neighbors and hosted domains, and the plan's name ([`d4efc9f`](https://github.com/internetdata/sdk-python/commit/d4efc9f89ba6869ec0b1070af5ced4b1287f9da4))
+
 ## 2.13.0 - 2026-11-15
 
 ### Features
