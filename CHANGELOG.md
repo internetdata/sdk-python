@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.15.0 - 2026-11-17
+
+### Features
+
+- Read cap_reached on a paid answer past its overage cap ([`f1c7511`](https://github.com/internetdata/sdk-python/commit/f1c75114328f28c5d39abfb4e1a25c98bcaa6d96))
+
 ## 2.14.0 - 2026-11-16
 
 ### Features
