@@ -21,7 +21,7 @@ T = TypeVar("T", bound="Database")
 
 @_attrs_define
 class Database:
-    """One database FAMILY, with your organization's license beside it. A
+    """One database family, with your organization's license beside it. A
     license covers the family, while a download names a specific version,
     so the IDs passed to `download` and `checksum` come from `versions`.
 

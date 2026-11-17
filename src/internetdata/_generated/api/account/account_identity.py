@@ -64,14 +64,14 @@ def sync_detailed(
      The identity behind this credential: what it is, the organization it is
     scoped to, and the scopes it currently holds.
 
-    `user` is present for an OAuth token and ABSENT for an API key, which
+    `user` is present for an OAuth token and absent for an API key, which
     has an organization but no person behind it. `credential.kind` says
     which you are holding, so a client can branch without guessing from a
     missing field.
 
     Narrower than what the console shows its own user on purpose: an
     integration needs a name to display and an organization to address, not
-    a profile. The `scopes` array is what the credential may do RIGHT NOW,
+    a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
 
@@ -101,14 +101,14 @@ def sync(
      The identity behind this credential: what it is, the organization it is
     scoped to, and the scopes it currently holds.
 
-    `user` is present for an OAuth token and ABSENT for an API key, which
+    `user` is present for an OAuth token and absent for an API key, which
     has an organization but no person behind it. `credential.kind` says
     which you are holding, so a client can branch without guessing from a
     missing field.
 
     Narrower than what the console shows its own user on purpose: an
     integration needs a name to display and an organization to address, not
-    a profile. The `scopes` array is what the credential may do RIGHT NOW,
+    a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
 
@@ -134,14 +134,14 @@ async def asyncio_detailed(
      The identity behind this credential: what it is, the organization it is
     scoped to, and the scopes it currently holds.
 
-    `user` is present for an OAuth token and ABSENT for an API key, which
+    `user` is present for an OAuth token and absent for an API key, which
     has an organization but no person behind it. `credential.kind` says
     which you are holding, so a client can branch without guessing from a
     missing field.
 
     Narrower than what the console shows its own user on purpose: an
     integration needs a name to display and an organization to address, not
-    a profile. The `scopes` array is what the credential may do RIGHT NOW,
+    a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
 
@@ -169,14 +169,14 @@ async def asyncio(
      The identity behind this credential: what it is, the organization it is
     scoped to, and the scopes it currently holds.
 
-    `user` is present for an OAuth token and ABSENT for an API key, which
+    `user` is present for an OAuth token and absent for an API key, which
     has an organization but no person behind it. `credential.kind` says
     which you are holding, so a client can branch without guessing from a
     missing field.
 
     Narrower than what the console shows its own user on purpose: an
     integration needs a name to display and an organization to address, not
-    a profile. The `scopes` array is what the credential may do RIGHT NOW,
+    a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
 

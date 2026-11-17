@@ -15,7 +15,7 @@ T = TypeVar("T", bound="ApikeyDetail")
 
 @_attrs_define
 class ApikeyDetail:
-    """Key METADATA. Never the key itself.
+    """Key metadata. Never the key itself.
 
     Attributes:
         id (UUID):
@@ -25,7 +25,7 @@ class ApikeyDetail:
         expires (datetime.datetime | None | Unset):
         last_used_at (datetime.datetime | None | Unset):
         revoked_at (datetime.datetime | None | Unset):
-        allowed_cidrs (list[str] | Unset): Source-IP allowlist. EMPTY MEANS UNRESTRICTED, not deny-all.
+        allowed_cidrs (list[str] | Unset): Source-IP allowlist. Empty means unrestricted, not deny-all.
         allowed_scopes (list[str] | Unset):
         retrievable (bool | Unset): Whether this key's secret can still be read back. False permanently for a key issued
             before secrets were stored recoverably.

@@ -97,7 +97,8 @@ def sync_detailed(
     sent, in
     the order you sent them; duplicates collapse. Needs a paid plan: a batch of one item is answered as
     the
-    lookup it is on any plan.
+    lookup it is on any plan. An overage cap reached part way through answers the remaining items with
+    Unlimited's fields and `cap_reached` `true`, in `results`.
 
     Args:
         body (BatchLookupRequest): Up to 1000 items across the three arrays, each optional.
@@ -133,7 +134,8 @@ def sync(
     sent, in
     the order you sent them; duplicates collapse. Needs a paid plan: a batch of one item is answered as
     the
-    lookup it is on any plan.
+    lookup it is on any plan. An overage cap reached part way through answers the remaining items with
+    Unlimited's fields and `cap_reached` `true`, in `results`.
 
     Args:
         body (BatchLookupRequest): Up to 1000 items across the three arrays, each optional.
@@ -164,7 +166,8 @@ async def asyncio_detailed(
     sent, in
     the order you sent them; duplicates collapse. Needs a paid plan: a batch of one item is answered as
     the
-    lookup it is on any plan.
+    lookup it is on any plan. An overage cap reached part way through answers the remaining items with
+    Unlimited's fields and `cap_reached` `true`, in `results`.
 
     Args:
         body (BatchLookupRequest): Up to 1000 items across the three arrays, each optional.
@@ -198,7 +201,8 @@ async def asyncio(
     sent, in
     the order you sent them; duplicates collapse. Needs a paid plan: a batch of one item is answered as
     the
-    lookup it is on any plan.
+    lookup it is on any plan. An overage cap reached part way through answers the remaining items with
+    Unlimited's fields and `cap_reached` `true`, in `results`.
 
     Args:
         body (BatchLookupRequest): Up to 1000 items across the three arrays, each optional.

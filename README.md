@@ -199,7 +199,7 @@ result = client.lookup("146.70.116.130", timeout=2)
 
 **Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
 
-Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit carries `Retry-After`, and retrying after it works: Unlimited's per-minute limit is one. A spent quota needs your allowance raised or the window to roll over. The library retries rate limits for you, but not a spent quota, and nothing else you sent either.
+Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit carries `Retry-After`, and retrying after it works: Unlimited's per-minute limit is one. One without it is `quota_exceeded`. The library retries rate limits for you, but not `quota_exceeded`, and nothing else you sent either. The API itself always sends `Retry-After` with a 429, so that one comes from something in between, such as a proxy; a paid key past its overage cap gets `cap_reached` instead.
 
 ### Database downloads
 
@@ -352,13 +352,14 @@ Each redirect URI must be https on a public host name, or http on a loopback add
 
 ### Fields your plan does not include
 
-Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's, the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its daily trial is spent. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
+Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's, the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its daily trial is spent. A paid key's carries `cap_reached`, true once its organization's overage cap is reached, when the answer has Unlimited's fields and isn't billed. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
 
 ```python
 result.flagged("is_hosting")   # False rather than None on a plan without it
 result.is_hosting is None      # True on Unlimited: not in your plan
 result.location.city is None   # True on Unlimited
 result.trial_expired is True   # a free-plan key's daily trial is spent
+result.cap_reached is True     # a paid key is past its overage cap
 ```
 
 ## Other Libraries

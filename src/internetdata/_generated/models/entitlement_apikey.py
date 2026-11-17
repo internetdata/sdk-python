@@ -19,7 +19,7 @@ class EntitlementApikey:
         Attributes:
             id (UUID):
             expires (datetime.datetime | None): Null for a key with no end date, which is the normal case.
-            allowed_cidrs (list[str]): The source addresses this key may be used from. EMPTY means
+            allowed_cidrs (list[str]): The source addresses this key may be used from. Empty means
                 unrestricted, never "deny all".
     """
 

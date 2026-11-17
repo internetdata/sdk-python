@@ -728,6 +728,11 @@ class Result:
     #: Unlimited's.
     trial_expired: bool | None = None
 
+    #: On answers to a key on a paid plan only: False while the answer has every field, True
+    #: once its organization's overage cap is reached and the answer has Unlimited's. Lookups
+    #: answered past the cap are not billed.
+    cap_reached: bool | None = None
+
     raw: dict[str, Any] = field(default_factory=dict)
 
     def flagged(self, flag: Flag) -> bool:
@@ -799,6 +804,7 @@ class AsnResult:
     downstreams: tuple[int, ...] | None = None
     hosted_domains: AsnHostedDomains | None = None
     trial_expired: bool | None = None
+    cap_reached: bool | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -894,6 +900,7 @@ class DomainResult:
     ip_ranges: DomainIpRanges | None = None
     disposable: DisposableDetail | None = None
     trial_expired: bool | None = None
+    cap_reached: bool | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 

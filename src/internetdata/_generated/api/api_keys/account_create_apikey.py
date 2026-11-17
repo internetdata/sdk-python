@@ -79,7 +79,7 @@ def sync_detailed(
 
      Creates a key and returns its secret.
 
-    This is the ONLY response that ever carries the secret, and only
+    This is the only response that ever carries the secret, and only
     because this is the moment it comes into existence. Store it now.
 
     Args:
@@ -113,7 +113,7 @@ def sync(
 
      Creates a key and returns its secret.
 
-    This is the ONLY response that ever carries the secret, and only
+    This is the only response that ever carries the secret, and only
     because this is the moment it comes into existence. Store it now.
 
     Args:
@@ -142,7 +142,7 @@ async def asyncio_detailed(
 
      Creates a key and returns its secret.
 
-    This is the ONLY response that ever carries the secret, and only
+    This is the only response that ever carries the secret, and only
     because this is the moment it comes into existence. Store it now.
 
     Args:
@@ -174,7 +174,7 @@ async def asyncio(
 
      Creates a key and returns its secret.
 
-    This is the ONLY response that ever carries the secret, and only
+    This is the only response that ever carries the secret, and only
     because this is the moment it comes into existence. Store it now.
 
     Args:

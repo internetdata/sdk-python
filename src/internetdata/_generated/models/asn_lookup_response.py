@@ -54,6 +54,9 @@ class AsnLookupResponse:
             and the 10 most popular. Its database lists up to 1,000 an AS. Paid plans and the trial.
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
             day's trial of every field lasts, `true` once the answer has Unlimited's fields.
+        cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer
+            has every field, `true` once its organization's overage cap is reached and the answer has Unlimited's. Lookups
+            answered past the cap are not billed; raising or removing the cap in Billing turns it `false` again.
     """
 
     asn: int
@@ -81,6 +84,7 @@ class AsnLookupResponse:
     downstreams: list[int] | Unset = UNSET
     hosted_domains: AsnHostedDomains | Unset = UNSET
     trial_expired: bool | Unset = UNSET
+    cap_reached: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -149,6 +153,8 @@ class AsnLookupResponse:
 
         trial_expired = self.trial_expired
 
+        cap_reached = self.cap_reached
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -199,6 +205,8 @@ class AsnLookupResponse:
             field_dict["hosted_domains"] = hosted_domains
         if trial_expired is not UNSET:
             field_dict["trial_expired"] = trial_expired
+        if cap_reached is not UNSET:
+            field_dict["cap_reached"] = cap_reached
 
         return field_dict
 
@@ -276,6 +284,8 @@ class AsnLookupResponse:
 
         trial_expired = d.pop("trial_expired", UNSET)
 
+        cap_reached = d.pop("cap_reached", UNSET)
+
         asn_lookup_response = cls(
             asn=asn,
             name=name,
@@ -302,6 +312,7 @@ class AsnLookupResponse:
             downstreams=downstreams,
             hosted_domains=hosted_domains,
             trial_expired=trial_expired,
+            cap_reached=cap_reached,
         )
 
         asn_lookup_response.additional_properties = d

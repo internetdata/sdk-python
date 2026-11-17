@@ -36,6 +36,9 @@ class DomainLookupResponse:
         disposable (DisposableDetail | Unset):
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
             day's trial of every field lasts, `true` once the answer has Unlimited's fields.
+        cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer
+            has every field, `true` once its organization's overage cap is reached and the answer has Unlimited's. Lookups
+            answered past the cap are not billed; raising or removing the cap in Billing turns it `false` again.
     """
 
     domain: str
@@ -50,6 +53,7 @@ class DomainLookupResponse:
     ip_ranges: DomainIpRanges | Unset = UNSET
     disposable: DisposableDetail | Unset = UNSET
     trial_expired: bool | Unset = UNSET
+    cap_reached: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,6 +87,8 @@ class DomainLookupResponse:
 
         trial_expired = self.trial_expired
 
+        cap_reached = self.cap_reached
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -106,6 +112,8 @@ class DomainLookupResponse:
             field_dict["disposable"] = disposable
         if trial_expired is not UNSET:
             field_dict["trial_expired"] = trial_expired
+        if cap_reached is not UNSET:
+            field_dict["cap_reached"] = cap_reached
 
         return field_dict
 
@@ -155,6 +163,8 @@ class DomainLookupResponse:
 
         trial_expired = d.pop("trial_expired", UNSET)
 
+        cap_reached = d.pop("cap_reached", UNSET)
+
         domain_lookup_response = cls(
             domain=domain,
             is_registered=is_registered,
@@ -168,6 +178,7 @@ class DomainLookupResponse:
             ip_ranges=ip_ranges,
             disposable=disposable,
             trial_expired=trial_expired,
+            cap_reached=cap_reached,
         )
 
         domain_lookup_response.additional_properties = d

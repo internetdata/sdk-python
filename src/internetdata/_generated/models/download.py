@@ -14,7 +14,7 @@ T = TypeVar("T", bound="Download")
 
 @_attrs_define
 class Download:
-    """One download ATTEMPT, refusals included.
+    """One download attempt, refusals included.
 
     Attributes:
         dataset_id (str):
@@ -22,7 +22,7 @@ class Download:
         outcome (DownloadOutcome):
         sample (bool): The evaluation sample rather than the database itself.
         open_ (bool): A download of an Open database.
-        bytes_ (int | None): Object size at redirect time, NOT bytes delivered: the transfer is a
+        bytes_ (int | None): Object size at redirect time, not bytes delivered: the transfer is a
             presigned redirect straight to object storage, so we never observe
             how much of it was taken.
         http_status (int | None):

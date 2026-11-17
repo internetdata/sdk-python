@@ -575,6 +575,7 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     "is_bogon a string": ("lookup", answer("8.8.8.8", is_bogon="false")),
     "is_tor null": ("lookup", answer("8.8.8.8", is_tor=None)),
     "is_vpn a number": ("lookup", answer("8.8.8.8", is_vpn=1)),
+    "cap_reached a string": ("lookup", answer("8.8.8.8", cap_reached="true")),
     "tor null": ("lookup", answer("8.8.8.8", tor=None)),
     "tor a list": ("lookup", answer("8.8.8.8", tor=[])),
     "a proxy's hits a numeric string": (
@@ -633,6 +634,7 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
         {**ASN, "prefixes": [{**ASN["prefixes"][0], "other_origins": ["174"]}]},
     ),
     "a domain's has_a a string": ("lookup_domain", {**DOMAIN, "has_a": "true"}),
+    "a domain's cap_reached a string": ("lookup_domain", {**DOMAIN, "cap_reached": "false"}),
     "a domain's dns missing a type": (
         "lookup_domain",
         {**DOMAIN, "dns": {k: v for k, v in DOMAIN["dns"].items() if k != "mx"}},
@@ -655,6 +657,7 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     ),
     "the AS rank a numeric string": ("lookup_asn", {**ASN, "rank": "341"}),
     "the AS tier1 a string": ("lookup_asn", {**ASN, "tier1": "false"}),
+    "the AS cap_reached a number": ("lookup_asn", {**ASN, "cap_reached": 1}),
     "the AS upstreams holding a string": ("lookup_asn", {**ASN, "upstreams": ["174"]}),
     "the AS downstreams holding null": ("lookup_asn", {**ASN, "downstreams": [None]}),
     "the AS hosted_domains without total": (
