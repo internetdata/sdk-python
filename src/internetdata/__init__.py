@@ -76,7 +76,7 @@ from .models import (
     Whois,
 )
 
-__version__ = "2.15.0"
+__version__ = "2.15.1"
 
 __all__ = [
     "DATABASE_FORMATS",

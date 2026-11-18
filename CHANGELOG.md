@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.15.1 - 2026-11-18
+
+### Fixes
+
+- Re-pin the spec to 2026.11.17 as republished: KEY_OVER_HTTP on the account 403 ([`ad49d69`](https://github.com/internetdata/sdk-python/commit/ad49d69304f141337f3d73ba5f30a2ee606425de))
+
 ## 2.15.0 - 2026-11-17
 
 ### Features
