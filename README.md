@@ -17,7 +17,7 @@ Requires Python 3.11 or newer. Type hints are included, and the package ships `p
 
 ## Usage
 
-**No API key needed to start.** Unlimited, the free plan, answers `location`, `asn`, `company`, `abuse` and every flag but the VPN, proxy, hosting and CDN ones, limited per address per minute, with a key or without one.
+**No API key needed to start.** Unlimited, the free plan, answers `location`, `asn`, `company`, `abuse` and every flag but the VPN, proxy, hosting and CDN ones, with no daily or monthly cap, with a key or without one.
 
 ```python
 from internetdata import InternetData
@@ -201,7 +201,7 @@ result = client.lookup("146.70.116.130", timeout=2)
 
 **Changed in 2.2.0:** a timeout of 0 or less, NaN or a string used to be accepted, and failed every call.
 
-Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit carries `Retry-After`, and retrying after it works: Unlimited's per-minute limit is one. One without it is `quota_exceeded`. The library retries rate limits for you, but not `quota_exceeded`, and nothing else you sent either. The API itself always sends `Retry-After` with a 429, so that one comes from something in between, such as a proxy; a paid key past its overage cap gets `cap_reached` instead.
+Note that `rate_limited` and `quota_exceeded` both arrive as HTTP 429 and are not the same thing. A rate limit carries `Retry-After`, and retrying after it works. One without it is `quota_exceeded`. The library retries rate limits for you, but not `quota_exceeded`, and nothing else you sent either. The API itself always sends `Retry-After` with a 429, so that one comes from something in between, such as a proxy; a paid key past its overage cap gets `cap_reached` instead.
 
 ### Database downloads
 

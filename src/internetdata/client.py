@@ -113,7 +113,7 @@ class InternetData:
     """A client for the InternetData API.
 
     No API key is needed to start: without one a lookup is on Unlimited, the free plan,
-    limited per address per minute. A batch needs a paid plan, and the databases a key
+    with no daily or monthly cap. A batch needs a paid plan, and the databases a key
     carrying the `db.download` scope. An absent or empty key sends no `Authorization`
     header at all rather than an empty one, and `oauth` needs no key at all.
 

@@ -82,7 +82,7 @@ class Lookup:
 class Options(Generic[Req]):
     """How a middleware behaves. Everything is optional, though a server almost
     certainly wants an api_key: without one a lookup is on Unlimited, the free plan, and
-    every lookup shares the per-minute limit of the server's one address."""
+    every lookup shares the rate limit of the server's one address."""
 
     #: An existing client to use. Prefer this if you already hold one: two clients mean
     #: two caches, and a cache is per instance because two keys can be on different
