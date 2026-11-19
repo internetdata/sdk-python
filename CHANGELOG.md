@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.15.2 - 2026-11-19
+
+### Fixes
+
+- Cache a spent trial's or a reached cap's answer for a minute at most ([`564ff88`](https://github.com/internetdata/sdk-python/commit/564ff88845497ffce3a502063e381cfc20c16aaf))
+
 ## 2.15.1 - 2026-11-18
 
 ### Fixes
