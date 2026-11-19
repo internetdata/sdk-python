@@ -134,6 +134,8 @@ client = InternetData(cache_max_size=50_000, cache_ttl=6 * 60 * 60)
 client_no_cache = InternetData(cache=False)
 ```
 
+An answer with `trial_expired` or `cap_reached` true is cached for a minute at most, so a new day's trial or a raised cap reaches you within a minute.
+
 ### Private and reserved addresses
 
 Private, loopback, link-local, documentation and multicast addresses (and their IPv6 equivalents, including the 6to4 and Teredo ranges) are in no database. The library answers them locally, so they cost no request and no quota:
