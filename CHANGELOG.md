@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.17.0 - 2026-11-20
+
+### Features
+
+- Read a paid domain answer's hosting, co-hosted domains, home page, redirects and backlinks ([`31974e6`](https://github.com/internetdata/sdk-python/commit/31974e6a9e9fee129cc382504e63629b2366dc44))
+
 ## 2.16.0 - 2026-11-20
 
 ### Features

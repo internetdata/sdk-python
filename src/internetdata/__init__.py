@@ -82,7 +82,7 @@ from .models import (
     Whois,
 )
 
-__version__ = "2.16.0"
+__version__ = "2.17.0"
 
 __all__ = [
     "DATABASE_FORMATS",
