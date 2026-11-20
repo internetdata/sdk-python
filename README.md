@@ -39,7 +39,7 @@ with InternetData() as client:
 
 ### With an API key
 
-Every paid plan answers every field: the VPN, proxy, hosting and CDN flags, the detail behind each flag, the city, the Whois records and more. The plans differ only in how many lookups they include, and a free account tries every field, 100 lookups a day. Create a key in the [console](https://app.internetdata.io), then pass it in:
+Every paid plan answers every field: the VPN, proxy, hosting and CDN flags, the detail behind each flag, the city, the Whois records and more. The plans differ only in how many lookups they include, and a free account tries every field. Create a key in the [console](https://app.internetdata.io), then pass it in:
 
 ```python
 import os
@@ -134,7 +134,7 @@ client = InternetData(cache_max_size=50_000, cache_ttl=6 * 60 * 60)
 client_no_cache = InternetData(cache=False)
 ```
 
-An answer with `trial_expired` or `cap_reached` true is cached for a minute at most, so a new day's trial or a raised cap reaches you within a minute.
+An answer with `trial_expired` or `cap_reached` true is cached for a minute at most, so a renewed trial or a raised cap reaches you within a minute.
 
 ### Private and reserved addresses
 
@@ -354,13 +354,13 @@ Each redirect URI must be https on a public host name, or http on a loopback add
 
 ### Fields your plan does not include
 
-Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's, the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its daily trial is spent. A paid key's carries `cap_reached`, true once its organization's overage cap is reached, when the answer has Unlimited's fields and isn't billed. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
+Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's, the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its trial is spent. A paid key's carries `cap_reached`, true once its organization's overage cap is reached, when the answer has Unlimited's fields and isn't billed. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
 
 ```python
 result.flagged("is_hosting")   # False rather than None on a plan without it
 result.is_hosting is None      # True on Unlimited: not in your plan
 result.location.city is None   # True on Unlimited
-result.trial_expired is True   # a free-plan key's daily trial is spent
+result.trial_expired is True   # a free-plan key's trial is spent
 result.cap_reached is True     # a paid key is past its overage cap
 ```
 
