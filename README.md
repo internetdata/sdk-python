@@ -171,7 +171,7 @@ domain = client.lookup_domain("example.com")
 print(domain.is_registered, domain.has_mx)   # True True
 ```
 
-On a paid plan an AS answer also carries its Whois record, its counts, every prefix it announces, its rank, Tier 1 flag, upstreams, peers and downstreams, and the domains it hosts, and a domain answer its DNS records, its organization's IP ranges and `is_disposable`. Neither is cached, and neither goes through the batch. `lookup` takes addresses alone, and refuses an AS or a domain with a `bad_request` before sending anything.
+On a paid plan an AS answer also carries its Whois record, its counts, every prefix it announces, its rank, Tier 1 flag, upstreams, peers and downstreams, and the domains it hosts, and a domain answer its DNS records, the network announcing each of its addresses, the other domains on its first IPv4 address, its organization's IP ranges, `is_disposable`, what its home page says and links to, and the domains whose home page redirects or links to it. Neither is cached, and neither goes through the batch. `lookup` takes addresses alone, and refuses an AS or a domain with a `bad_request` before sending anything.
 
 ### Errors
 
