@@ -33,6 +33,7 @@ __all__ = [
     "BitTorrentDetail",
     "CarrierDetail",
     "ClassDetail",
+    "CohostedDomains",
     "Company",
     "Database",
     "DatabaseMetadata",
@@ -44,10 +45,15 @@ __all__ = [
     "DnsMxRecord",
     "DnsNsRecord",
     "DnsResolverDetail",
+    "DomainBacklinks",
     "DomainDns",
+    "DomainHost",
     "DomainIpRange",
     "DomainIpRanges",
+    "DomainRedirects",
     "DomainResult",
+    "DomainWeb",
+    "DomainWebLinks",
     "Download",
     "Entitlement",
     "EntitlementApikey",
@@ -891,10 +897,73 @@ class DisposableDetail:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class DomainHost:
+    """An address the domain resolves to, and the network announcing it."""
+
+    ip: str
+    #: As an address lookup's `asn`; every member empty where IP ASN holds none.
+    asn: Asn
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CohostedDomains:
+    """From IP Hosted Domains: the other registered domains on the domain's first IPv4
+    address, how many and the 10 most popular."""
+
+    #: The domain's first IPv4 address, empty where it has none.
+    ip: str
+    total: int
+    #: Up to 10 of them, the most popular first, the domain itself left out.
+    domains: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DomainWebLinks:
+    """The external hosts the home page links to."""
+
+    total: int
+    #: Up to 10 of them.
+    hosts: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DomainWeb:
+    """What our crawl last read of the domain's own home page, every member empty where it
+    holds none."""
+
+    url: str
+    title: str
+    description: str
+    #: The day it was last read.
+    last_seen: str
+    links: DomainWebLinks
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DomainRedirects:
+    """The registered domains whose home page redirects to this one, how many and the 10
+    most popular."""
+
+    total: int
+    domains: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DomainBacklinks:
+    """The registered domains whose home page links to this one, how many and the 10 most
+    popular."""
+
+    total: int
+    domains: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class DomainResult:
     """What a domain lookup answers: on every plan whether it is registered and which DNS
-    record types it has; on a paid one the records, the organization's IP ranges and
-    whether it is a disposable email domain. None is "not in your plan", as on `Result`."""
+    record types it has; on a paid one the records, the network announcing each address,
+    the other domains on its first IPv4 address, the organization's IP ranges, whether it
+    is a disposable email domain, its home page, and the domains whose home page redirects
+    or links to it. None is "not in your plan", as on `Result`."""
 
     domain: str
     is_registered: bool
@@ -905,8 +974,13 @@ class DomainResult:
     has_ns: bool
     has_cname: bool
     dns: DomainDns | None = None
+    hosting: tuple[DomainHost, ...] | None = None
+    cohosted_domains: CohostedDomains | None = None
     ip_ranges: DomainIpRanges | None = None
     disposable: DisposableDetail | None = None
+    web: DomainWeb | None = None
+    redirects: DomainRedirects | None = None
+    backlinks: DomainBacklinks | None = None
     trial_expired: bool | None = None
     cap_reached: bool | None = None
     raw: dict[str, Any] = field(default_factory=dict)

@@ -639,6 +639,39 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
         "lookup_domain",
         {**DOMAIN, "dns": {k: v for k, v in DOMAIN["dns"].items() if k != "mx"}},
     ),
+    "a domain's hosting entry without its asn": (
+        "lookup_domain",
+        {**DOMAIN, "hosting": [{"ip": "192.0.2.10"}]},
+    ),
+    "a domain's hosting asn a string": (
+        "lookup_domain",
+        {**DOMAIN, "hosting": [{"ip": "192.0.2.10", "asn": "64496"}]},
+    ),
+    "a domain's hosting holding null": ("lookup_domain", {**DOMAIN, "hosting": [None]}),
+    "a domain's cohosted_domains total a string": (
+        "lookup_domain",
+        {**DOMAIN, "cohosted_domains": {**DOMAIN["cohosted_domains"], "total": "3"}},
+    ),
+    "a domain's cohosted_domains list null": (
+        "lookup_domain",
+        {**DOMAIN, "cohosted_domains": {**DOMAIN["cohosted_domains"], "domains": None}},
+    ),
+    "a domain's web without links": (
+        "lookup_domain",
+        {**DOMAIN, "web": {k: v for k, v in DOMAIN["web"].items() if k != "links"}},
+    ),
+    "a domain's web last_seen a number": (
+        "lookup_domain",
+        {**DOMAIN, "web": {**DOMAIN["web"], "last_seen": 20261118}},
+    ),
+    "a domain's redirects holding a number": (
+        "lookup_domain",
+        {**DOMAIN, "redirects": {"total": 1, "domains": [1]}},
+    ),
+    "a domain's backlinks without total": (
+        "lookup_domain",
+        {**DOMAIN, "backlinks": {"domains": []}},
+    ),
     "the entitlement's quota a numeric string": (
         "my_entitlement",
         {**ENTITLEMENT, "usage": {**ENTITLEMENT["usage"], "quota": "5000000"}},
@@ -850,6 +883,12 @@ LOOKUP_MODELS = {
     "DomainIpRanges": "domain_ip_ranges.DomainIpRanges",
     "DomainIpRange": "domain_ip_range.DomainIpRange",
     "DisposableDetail": "disposable_detail.DisposableDetail",
+    "DomainHost": "domain_host.DomainHost",
+    "CohostedDomains": "cohosted_domains.CohostedDomains",
+    "DomainWeb": "domain_web.DomainWeb",
+    "DomainWebLinks": "domain_web_links.DomainWebLinks",
+    "DomainRedirects": "domain_redirects.DomainRedirects",
+    "DomainBacklinks": "domain_backlinks.DomainBacklinks",
     "Entitlement": "entitlement.Entitlement",
     "EntitlementApikey": "entitlement_apikey.EntitlementApikey",
     "EntitlementPlan": "entitlement_plan.EntitlementPlan",

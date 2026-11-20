@@ -26,6 +26,7 @@ from .carrier_detail import CarrierDetail
 from .class_detail import ClassDetail
 from .client_registration import ClientRegistration
 from .client_registration_request import ClientRegistrationRequest
+from .cohosted_domains import CohostedDomains
 from .company import Company
 from .database import Database
 from .database_checksum_v2_response_200 import DatabaseChecksumV2Response200
@@ -52,10 +53,15 @@ from .dns_cname_record import DnsCnameRecord
 from .dns_mx_record import DnsMxRecord
 from .dns_ns_record import DnsNsRecord
 from .dns_resolver_detail import DnsResolverDetail
+from .domain_backlinks import DomainBacklinks
 from .domain_dns import DomainDns
+from .domain_host import DomainHost
 from .domain_ip_range import DomainIpRange
 from .domain_ip_ranges import DomainIpRanges
 from .domain_lookup_response import DomainLookupResponse
+from .domain_redirects import DomainRedirects
+from .domain_web import DomainWeb
+from .domain_web_links import DomainWebLinks
 from .download import Download
 from .download_outcome import DownloadOutcome
 from .entitlement import Entitlement
@@ -117,6 +123,7 @@ __all__ = (
     "ClassDetail",
     "ClientRegistration",
     "ClientRegistrationRequest",
+    "CohostedDomains",
     "Company",
     "Database",
     "DatabaseChecksumV2Response200",
@@ -141,10 +148,15 @@ __all__ = (
     "DnsMxRecord",
     "DnsNsRecord",
     "DnsResolverDetail",
+    "DomainBacklinks",
     "DomainDns",
+    "DomainHost",
     "DomainIpRange",
     "DomainIpRanges",
     "DomainLookupResponse",
+    "DomainRedirects",
+    "DomainWeb",
+    "DomainWebLinks",
     "Download",
     "DownloadOutcome",
     "Entitlement",
