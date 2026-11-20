@@ -34,8 +34,8 @@ class DomainLookupResponse:
         ip_ranges (DomainIpRanges | Unset): The organization's IP ranges, from Domain IP Ranges. Paid plans and the
             trial.
         disposable (DisposableDetail | Unset):
-        trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
-            day's trial of every field lasts, `true` once the answer has Unlimited's fields.
+        trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
+            organization's trial of every field lasts, `true` once the answer has Unlimited's fields.
         cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer
             has every field, `true` once its organization's overage cap is reached and the answer has Unlimited's. Lookups
             answered past the cap are not billed; raising or removing the cap in Billing turns it `false` again.

@@ -815,7 +815,7 @@ class Cache:
     shape. The lock is not optional, because the sync batch drives lookups from a thread
     pool and `TLRUCache` is not thread-safe.
 
-    A reduced answer, a spent trial's or a reached cap's, ends with a new UTC day or a
+    A reduced answer, a spent trial's or a reached cap's, ends with a renewed trial or a
     raised cap, so it stays a minute at most rather than the TTL. It is still cached, or a
     busy process would send every repeat of an address to the API.
     """

@@ -60,9 +60,10 @@ def sync_detailed(
 ) -> Response[AccountRc]:
     """Members
 
-     Read-only. Adding or removing a member is an invitation flow with email
-    in the middle rather than a POST, and modeling it as one here would
-    promise something this API does not do.
+     Lists the members of your organization. Adding or removing one is an
+    emailed invitation in the console, not an API call.
+
+    Modeling it as one here would promise something this API does not do.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -87,9 +88,10 @@ def sync(
 ) -> AccountRc | None:
     """Members
 
-     Read-only. Adding or removing a member is an invitation flow with email
-    in the middle rather than a POST, and modeling it as one here would
-    promise something this API does not do.
+     Lists the members of your organization. Adding or removing one is an
+    emailed invitation in the console, not an API call.
+
+    Modeling it as one here would promise something this API does not do.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -110,9 +112,10 @@ async def asyncio_detailed(
 ) -> Response[AccountRc]:
     """Members
 
-     Read-only. Adding or removing a member is an invitation flow with email
-    in the middle rather than a POST, and modeling it as one here would
-    promise something this API does not do.
+     Lists the members of your organization. Adding or removing one is an
+    emailed invitation in the console, not an API call.
+
+    Modeling it as one here would promise something this API does not do.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -135,9 +138,10 @@ async def asyncio(
 ) -> AccountRc | None:
     """Members
 
-     Read-only. Adding or removing a member is an invitation flow with email
-    in the middle rather than a POST, and modeling it as one here would
-    promise something this API does not do.
+     Lists the members of your organization. Adding or removing one is an
+    emailed invitation in the console, not an API call.
+
+    Modeling it as one here would promise something this API does not do.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

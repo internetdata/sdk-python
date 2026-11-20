@@ -61,11 +61,10 @@ def sync_detailed(
 ) -> Response[AccountOrgWrap | AccountRc]:
     """Organization
 
-     The organization this credential is scoped to.
+     Returns the organization the presented credential is scoped to. A
+    credential belongs to exactly one, so there is no ID to pass.
 
-    There is no way to name a different one. A credential describes exactly
-    one organization, so an identifier in the path could only ever be your
-    own or a refusal.
+    An identifier in the path could only ever be your own or a refusal.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -90,11 +89,10 @@ def sync(
 ) -> AccountOrgWrap | AccountRc | None:
     """Organization
 
-     The organization this credential is scoped to.
+     Returns the organization the presented credential is scoped to. A
+    credential belongs to exactly one, so there is no ID to pass.
 
-    There is no way to name a different one. A credential describes exactly
-    one organization, so an identifier in the path could only ever be your
-    own or a refusal.
+    An identifier in the path could only ever be your own or a refusal.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -115,11 +113,10 @@ async def asyncio_detailed(
 ) -> Response[AccountOrgWrap | AccountRc]:
     """Organization
 
-     The organization this credential is scoped to.
+     Returns the organization the presented credential is scoped to. A
+    credential belongs to exactly one, so there is no ID to pass.
 
-    There is no way to name a different one. A credential describes exactly
-    one organization, so an identifier in the path could only ever be your
-    own or a refusal.
+    An identifier in the path could only ever be your own or a refusal.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -142,11 +139,10 @@ async def asyncio(
 ) -> AccountOrgWrap | AccountRc | None:
     """Organization
 
-     The organization this credential is scoped to.
+     Returns the organization the presented credential is scoped to. A
+    credential belongs to exactly one, so there is no ID to pass.
 
-    There is no way to name a different one. A credential describes exactly
-    one organization, so an identifier in the path could only ever be your
-    own or a refusal.
+    An identifier in the path could only ever be your own or a refusal.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

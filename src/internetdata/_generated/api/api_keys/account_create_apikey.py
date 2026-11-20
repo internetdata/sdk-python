@@ -77,10 +77,8 @@ def sync_detailed(
 ) -> Response[AccountCreatedApikey | AccountRc]:
     """Create
 
-     Creates a key and returns its secret.
-
-    This is the only response that ever carries the secret, and only
-    because this is the moment it comes into existence. Store it now.
+     Creates an API key and returns its secret, which no list ever shows:
+    keep it, or reveal it again later.
 
     Args:
         body (AccountCreateApikeyRequest):
@@ -111,10 +109,8 @@ def sync(
 ) -> AccountCreatedApikey | AccountRc | None:
     """Create
 
-     Creates a key and returns its secret.
-
-    This is the only response that ever carries the secret, and only
-    because this is the moment it comes into existence. Store it now.
+     Creates an API key and returns its secret, which no list ever shows:
+    keep it, or reveal it again later.
 
     Args:
         body (AccountCreateApikeyRequest):
@@ -140,10 +136,8 @@ async def asyncio_detailed(
 ) -> Response[AccountCreatedApikey | AccountRc]:
     """Create
 
-     Creates a key and returns its secret.
-
-    This is the only response that ever carries the secret, and only
-    because this is the moment it comes into existence. Store it now.
+     Creates an API key and returns its secret, which no list ever shows:
+    keep it, or reveal it again later.
 
     Args:
         body (AccountCreateApikeyRequest):
@@ -172,10 +166,8 @@ async def asyncio(
 ) -> AccountCreatedApikey | AccountRc | None:
     """Create
 
-     Creates a key and returns its secret.
-
-    This is the only response that ever carries the secret, and only
-    because this is the moment it comes into existence. Store it now.
+     Creates an API key and returns its secret, which no list ever shows:
+    keep it, or reveal it again later.
 
     Args:
         body (AccountCreateApikeyRequest):

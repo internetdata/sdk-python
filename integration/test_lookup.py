@@ -141,7 +141,7 @@ def test_the_key_reaches_the_wire_and_the_answer_keeps_its_shape() -> None:
         assert fact.carried_key, f"the request to {fact.path} carried no key"
     assert_read_as_served(result, result.raw, "answer")
     assert_read_as_served(domain, domain.raw, "domain answer")
-    # A free-plan key's answer is Unlimited's once its day's trial is spent, and marks it.
+    # A free-plan key's answer is Unlimited's once its trial is spent, and marks it.
     dropped = set(keyless.raw) - set(result.raw) - {"trial_expired"}
     assert not dropped, f"the key's answer drops {sorted(dropped)}, which a keyless one serves"
     print(f"==> staging: {PROBE} keyed, {len(result.raw)} members")

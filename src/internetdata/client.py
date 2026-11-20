@@ -313,9 +313,10 @@ class InternetData:
         Unlike a lookup there is no useful unauthenticated answer, so a client built
         without a key gets an unauthorized error rather than a partial one.
 
-        Usage counts against the ALLOWANCE WINDOW - on a paid plan the anniversary of
-        the subscription, not the calendar month and not the billing period, and on the
-        free plan the UTC day - and it is the same number a lookup is gated on. It can
+        Usage counts against the ALLOWANCE WINDOW on a paid plan - the anniversary of
+        the subscription, not the calendar month and not the billing period - and on the
+        free plan it counts its trial, the lookups answered with every field. It is the
+        same number a lookup is gated on. It can
         lag by a few seconds, because requests are counted in memory and flushed in
         aggregate.
 
@@ -562,8 +563,7 @@ class DatabaseApi:
     ) -> builtins.list[Download]:
         """Your organization's recent download attempts, newest first.
 
-        Refusals are listed too: a denial is what answers "it stopped working", and its
-        absence answers nothing.
+        Refused ones are listed too, so a download that stopped working shows why.
 
         `timeout` bounds each attempt at this call alone, in place of the client's.
         """

@@ -52,8 +52,8 @@ class AsnLookupResponse:
         downstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
         hosted_domains (AsnHostedDomains | Unset): From ASN Hosted Domains: how many registered domains the AS hosts,
             and the 10 most popular. Its database lists up to 1,000 an AS. Paid plans and the trial.
-        trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while the
-            day's trial of every field lasts, `true` once the answer has Unlimited's fields.
+        trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
+            organization's trial of every field lasts, `true` once the answer has Unlimited's fields.
         cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer
             has every field, `true` once its organization's overage cap is reached and the answer has Unlimited's. Lookups
             answered past the cap are not billed; raising or removing the cap in Billing turns it `false` again.

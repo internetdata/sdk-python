@@ -21,8 +21,8 @@ class Asn:
         domain (str): Its operator's domain.
         type_ (str): The kind of network it runs.
         prefix (str): The announced prefix covering the address.
-        country (str | Unset): The country its registry assigned it to. Paid plans and the trial.
-        rpki_status (str | Unset): The announcement's RPKI status. Paid plans and the trial.
+        country (str | Unset): The country its registry assigned it to.
+        rpki_status (str | Unset): The announcement's RPKI status.
     """
 
     asn: int

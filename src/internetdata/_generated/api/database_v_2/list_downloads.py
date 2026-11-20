@@ -72,8 +72,8 @@ def sync_detailed(
 ) -> Response[Error | ListDownloadsResponse200]:
     """History
 
-     Refusals are listed too: a denial is what answers "it stopped working",
-    and its absence answers nothing.
+     Lists your organization's recent database downloads, newest first,
+    refused ones included, so a download that stopped working shows why.
 
     Args:
         limit (int | Unset):  Default: 50.
@@ -104,8 +104,8 @@ def sync(
 ) -> Error | ListDownloadsResponse200 | None:
     """History
 
-     Refusals are listed too: a denial is what answers "it stopped working",
-    and its absence answers nothing.
+     Lists your organization's recent database downloads, newest first,
+    refused ones included, so a download that stopped working shows why.
 
     Args:
         limit (int | Unset):  Default: 50.
@@ -131,8 +131,8 @@ async def asyncio_detailed(
 ) -> Response[Error | ListDownloadsResponse200]:
     """History
 
-     Refusals are listed too: a denial is what answers "it stopped working",
-    and its absence answers nothing.
+     Lists your organization's recent database downloads, newest first,
+    refused ones included, so a download that stopped working shows why.
 
     Args:
         limit (int | Unset):  Default: 50.
@@ -161,8 +161,8 @@ async def asyncio(
 ) -> Error | ListDownloadsResponse200 | None:
     """History
 
-     Refusals are listed too: a denial is what answers "it stopped working",
-    and its absence answers nothing.
+     Lists your organization's recent database downloads, newest first,
+    refused ones included, so a download that stopped working shows why.
 
     Args:
         limit (int | Unset):  Default: 50.

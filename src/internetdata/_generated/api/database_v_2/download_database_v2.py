@@ -100,8 +100,10 @@ def sync_detailed(
 ) -> Response[Any | Error]:
     """Download
 
-     Answers `302`; the bytes come straight from object storage rather than
-    through this API. Follow the redirect.
+     Downloads one file of a database: the answer is a `302` to time-limited
+    object storage, so follow the redirect.
+
+    The bytes come straight from object storage rather than through this API.
 
     Args:
         id (str):  Example: vpn_ip_v1.
@@ -138,8 +140,10 @@ def sync(
 ) -> Any | Error | None:
     """Download
 
-     Answers `302`; the bytes come straight from object storage rather than
-    through this API. Follow the redirect.
+     Downloads one file of a database: the answer is a `302` to time-limited
+    object storage, so follow the redirect.
+
+    The bytes come straight from object storage rather than through this API.
 
     Args:
         id (str):  Example: vpn_ip_v1.
@@ -171,8 +175,10 @@ async def asyncio_detailed(
 ) -> Response[Any | Error]:
     """Download
 
-     Answers `302`; the bytes come straight from object storage rather than
-    through this API. Follow the redirect.
+     Downloads one file of a database: the answer is a `302` to time-limited
+    object storage, so follow the redirect.
+
+    The bytes come straight from object storage rather than through this API.
 
     Args:
         id (str):  Example: vpn_ip_v1.
@@ -207,8 +213,10 @@ async def asyncio(
 ) -> Any | Error | None:
     """Download
 
-     Answers `302`; the bytes come straight from object storage rather than
-    through this API. Follow the redirect.
+     Downloads one file of a database: the answer is a `302` to time-limited
+    object storage, so follow the redirect.
+
+    The bytes come straight from object storage rather than through this API.
 
     Args:
         id (str):  Example: vpn_ip_v1.
