@@ -76,7 +76,6 @@ from ._generated.api.entitlement import my_entitlement
 from ._generated.api.lookup import lookup_asn, lookup_batch, lookup_domain, lookup_ip, lookup_my_ip
 from ._generated.client import AuthenticatedClient
 from ._generated.models.batch_lookup_request import BatchLookupRequest
-from ._generated.models.database_format import DatabaseFormat
 from .bogon import bogon_result, is_bogon, unmapped
 from .errors import InternetDataError, OauthError, OauthExpiredTokenError
 from .models import (
@@ -102,6 +101,7 @@ from .models import (
     to_oauth_metadata,
     to_result,
     to_token_response,
+    wire_format,
 )
 
 __all__ = ["DatabaseApi", "InternetData", "OauthApi"]
@@ -552,7 +552,7 @@ class DatabaseApi:
                 self._client,
                 self._bound(timeout),
                 id=database_id,
-                format_=DatabaseFormat(format),
+                format_=wire_format(format),
             )
             return parse_body(res, checksums_of)
 
@@ -606,7 +606,7 @@ class DatabaseApi:
                 self._client,
                 self._bound(timeout),
                 id=database_id,
-                format_=DatabaseFormat(format),
+                format_=wire_format(format),
                 build=build_,
             )
             return redirect_location(res)

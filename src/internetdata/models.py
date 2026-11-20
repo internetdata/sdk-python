@@ -18,6 +18,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeVar, get_args
 
+from ._generated.models.database_format import DatabaseFormat
 from .errors import InternetDataError
 
 __all__ = [
@@ -77,16 +78,21 @@ __all__ = [
 Format = Literal["csvgz", "mmdb"]
 """The file formats a database version can be built in.
 
+A request names one of these. An answer can carry a format the API added after this
+release, which comes back as the string served.
+
 Which of them a given version HAS is `DatabaseVersion.formats`; asking for another is a
 `bad_request` rather than a gap, because the `_provider` catalogs are keyed by provider
 ID and no MMDB exists for them.
 """
 
 Standing = Literal["licensed", "expired", "unlicensed"]
-"""Where your organization stands with one database family."""
+"""Where your organization stands with one database family. One the API adds after this
+release comes back as the string served."""
 
 LicenseType = Literal["evaluation", "standard", "redistribute"]
-"""What a license permits you to do with the data. `None` when there is no license."""
+"""What a license permits you to do with the data. `None` when there is no license. One the
+API adds after this release comes back as the string served."""
 
 DATABASE_FORMATS: tuple[Format, ...] = get_args(Format)
 """Every `Format`, at runtime.
@@ -95,6 +101,16 @@ A `Literal` is erased to nothing a program can check against, so a format read f
 flag, a form or a config file has these to be tested against before a call.
 """
 
+
+def wire_format(format: object) -> DatabaseFormat:
+    """`format` as a request names it. An answer may carry a format this release was not
+    built with, which reads as served, but a request naming one is refused here, before the
+    network, as the API would refuse it a round trip later."""
+    if not isinstance(format, str) or format not in DATABASE_FORMATS:
+        raise ValueError(f"{format!r} is not a valid DatabaseFormat")
+    return DatabaseFormat(format)
+
+
 STANDINGS: tuple[Standing, ...] = get_args(Standing)
 """Every `Standing`, at runtime."""
 
@@ -102,7 +118,8 @@ LICENSE_TYPES: tuple[LicenseType, ...] = get_args(LicenseType)
 """Every `LicenseType`, at runtime. `None`, for no license, is not one of them."""
 
 Outcome = Literal["ok", "unauthorized", "denied", "expired", "unknown", "unavailable"]
-"""How one download attempt ended, refusals included."""
+"""How one download attempt ended, refusals included. One the API adds after this release
+comes back as the string served."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,8 +235,8 @@ def to_database(body: dict[str, Any]) -> Database:
         base=_present(body, "base", str),
         name=_present(body, "name", str),
         summary=_present(body, "summary", str),
-        standing=_one_of(_present(body, "standing", str), STANDINGS, "standing"),
-        license_type=_one_of(_nullable(body, "license_type", str), LICENSE_TYPES, "license_type"),
+        standing=_present(body, "standing", str),
+        license_type=_nullable(body, "license_type", str),
         starts=_datetime(body["starts"], "starts"),
         expires=_datetime(body["expires"], "expires"),
         renews_at=_datetime(body["renews_at"], "renews_at"),
@@ -282,7 +299,7 @@ def to_download(body: dict[str, Any]) -> Download:
     return Download(
         dataset_id=_present(body, "dataset_id", str),
         format=_present(body, "format", str),
-        outcome=_one_of(_present(body, "outcome", str), get_args(Outcome), "outcome"),
+        outcome=_present(body, "outcome", str),
         created=_date_time(_present(body, "created", str), "created"),
         bytes=_nullable(body, "bytes", int),
         http_status=_nullable(body, "http_status", int),
@@ -323,15 +340,6 @@ def _of_type(value: Any, name: str, kind: type) -> Any:
 
 def _strings(values: list[Any], name: str) -> tuple[Any, ...]:
     return tuple(_of_type(v, name, str) for v in values)
-
-
-def _one_of(value: Any, allowed: tuple[str, ...], name: str) -> Any:
-    """`value`, a member of `allowed`, or None. One outside it is a value this client was not
-    built for: `license_type` came back as served while its type promised one of three, and
-    `standing` beside it was refused (2.9.2, measured 2026-10-25)."""
-    if value is not None and value not in allowed:
-        raise ValueError(f"{name} is not one of {', '.join(allowed)}: {value!r}")
-    return value
 
 
 def _sizes(sizes: Any, name: str) -> dict[str, int]:
@@ -421,7 +429,8 @@ Flag = Literal[
 ]
 
 EntitlementPlanTier = Literal["free", "starter", "scale", "max"]
-"""The pricing tier a plan grants."""
+"""The pricing tier a plan grants. One the API adds after this release comes back as the
+string served."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1014,7 +1023,9 @@ def _value(value: Any, kind: Any, name: str) -> Any:
             for key, item in _of_type(value, name, dict).items()
         }
     if origin is Literal:
-        return _one_of(_of_type(value, name, str), get_args(kind), name)
+        # A closed vocabulary in an answer is the API's to extend: a value this release was
+        # not built with comes back as the string served, and only a string reads.
+        return _of_type(value, name, str)
     if isinstance(kind, type) and dataclasses.is_dataclass(kind):
         return _record(kind, value, name)
     if kind is float:

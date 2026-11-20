@@ -7,6 +7,7 @@ disagreeing about the same response.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from typing import Any
 
@@ -544,3 +545,84 @@ def test_every_trailing_slash_on_the_base_url_is_dropped(
     client.oauth.metadata()
 
     assert stub.paths() == [LIST_PATH, CHECKSUM_PATH, "/.well-known/oauth-authorization-server"]
+
+
+# What each corpus call is, here: the path it is served at, and the call that reads it.
+# The listing and the downloads log come back as the list their envelope holds, so the
+# envelope's own name leads each `expect` path and is read as that list.
+VOCABULARY_CALLS: dict[str, tuple[str, str | None, Callable[[ClientAdapter], Any]]] = {
+    "myEntitlement": ("/api/v1/entitlement", None, lambda client: client.my_entitlement()),
+    "listDatabases": (LIST_PATH, "databases", lambda client: client.database.list()),
+    "listDownloads": (
+        "/api/v2/database/downloads",
+        "downloads",
+        lambda client: client.database.downloads(),
+    ),
+}
+
+
+def _vocabulary_case_ids() -> list[str]:
+    return [case["name"] for case in TESTDATA["vocabulary"]["cases"]]
+
+
+@pytest.mark.parametrize("name", _vocabulary_case_ids())
+def test_a_value_the_api_adds_to_a_vocabulary_comes_back_as_served(
+    make_client: ClientFactory, name: str
+) -> None:
+    """A tier, standing, license type, format or outcome no published list holds is the
+    API's to add, and the answer still reads: through 2.15.2 every one failed the call as a
+    retried `server_error`, so the API could add none without breaking every installed
+    copy."""
+    (case,) = (c for c in TESTDATA["vocabulary"]["cases"] if c["name"] == name)
+    path, envelope, call = VOCABULARY_CALLS[case["call"]]
+    stub = Stub({path: {"body": case["answer"]}})
+    client = make_client(transport=stub.transport, retries=0)
+
+    got = call(client)
+
+    for wire, want in case["expect"].items():
+        steps = wire.split(".")
+        node: Any = got
+        if envelope is not None:
+            assert steps[0] == envelope, f"{wire} does not start at {envelope}"
+            steps = steps[1:]
+        for step in steps:
+            node = node[int(step)] if step.isdigit() else getattr(node, step)
+        assert node == want, f"{name}: {wire} read {node!r}, served {want!r}"
+    assert len(stub.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("call", "member", "value"),
+    [
+        ("listDatabases", "standing", 7),
+        ("listDatabases", "license_type", True),
+        ("listDownloads", "outcome", ["ok"]),
+        ("myEntitlement", "tier", {"x": 1}),
+    ],
+)
+def test_a_vocabulary_member_of_the_wrong_type_is_still_refused(
+    make_client: ClientFactory, call: str, member: str, value: Any
+) -> None:
+    """Opening a vocabulary opens it to STRINGS: a number, a bool, a list or an object
+    there is the server's failure, as before."""
+    case = next(
+        c
+        for c in TESTDATA["vocabulary"]["cases"]
+        if c["call"] == call and c["name"] != "entitlement-plan-name"
+    )
+    body = copy.deepcopy(case["answer"])
+    target = {
+        "listDatabases": lambda b: b["databases"][0],
+        "listDownloads": lambda b: b["downloads"][0],
+        "myEntitlement": lambda b: b["plan"],
+    }[call](body)
+    target[member] = value
+    path, _, read = VOCABULARY_CALLS[call]
+    stub = Stub({path: {"body": body}})
+    client = make_client(transport=stub.transport, retries=0)
+
+    with pytest.raises(InternetDataError) as caught:
+        read(client)
+
+    assert caught.value.kind == "server_error"

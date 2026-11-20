@@ -485,9 +485,9 @@ UNREADABLE_MEMBERS.update(
     {
         "list databases as an object": (LIST_PATH, {"databases": {}}),
         "downloads as an object": (DOWNLOADS_PATH, {"downloads": {}}),
-        "list license_type outside its enum": (
+        "list license_type as a number": (
             LIST_PATH,
-            {"databases": [_with("license_type", "trial", database("bogon_ip"))]},
+            {"databases": [_with("license_type", 7, database("bogon_ip"))]},
         ),
         "list sample_formats as an object": (
             LIST_PATH,
@@ -989,14 +989,19 @@ def test_a_usable_timeout_builds_a_client(timeout: float | None) -> None:
 
 
 # Refused before the network, and never retried: a typo is the caller's, not a failure of
-# the server's to wait out.
-def test_an_unpublished_format_is_refused_before_any_request(make_client: ClientFactory) -> None:
+# the server's to wait out. A format an answer may carry once the API adds it, `parquet`, is
+# still one this release cannot ask for.
+@pytest.mark.parametrize("fmt", ["zip", "parquet"])
+@pytest.mark.parametrize("call", ["checksums", "download_url"])
+def test_an_unpublished_format_is_refused_before_any_request(
+    make_client: ClientFactory, fmt: str, call: str
+) -> None:
     stub = Stub({CHECKSUM_PATH: {"body": {"checksums": {"sha256": "00"}}}})
     client = make_client(transport=stub.transport, retries=2)
 
     started = time.monotonic()
-    with pytest.raises(ValueError, match="zip"):
-        client.database.checksums("bogon_ip_v1", "zip")
+    with pytest.raises(ValueError, match=fmt):
+        getattr(client.database, call)("bogon_ip_v1", fmt)
 
     assert stub.requests == []
     assert time.monotonic() - started < 0.5, "the refusal was retried"
@@ -1011,21 +1016,18 @@ def test_the_base_url_is_overridable(make_client: ClientFactory) -> None:
     assert str(stub.requests[0].url) == f"{API}{LIST_PATH}"
 
 
-# The generated decoder validates the spec's enums as it parses, so a `standing` added to
-# the API after this client was generated is refused rather than passed through. Pinned as
-# a limitation, not a feature: what matters is that it stays inside this library's one
-# error type instead of arriving as a bare TypeError out of generated code.
-def test_a_value_this_client_was_not_generated_for_stays_inside_the_error_type(
+# A `standing` the API adds after this client was generated reads as served: through 2.15.2
+# the generated decoder refused it, failing the whole listing as a `server_error`.
+def test_a_value_this_client_was_not_generated_for_comes_back_as_served(
     make_client: ClientFactory,
 ) -> None:
     stub = Stub({LIST_PATH: {"body": {"databases": [database("bogon_ip", standing="trial")]}}})
     client = make_client(transport=stub.transport, retries=0)
 
-    with pytest.raises(InternetDataError) as caught:
-        client.database.list()
+    (listed,) = client.database.list()
 
-    assert caught.value.kind == "server_error"
-    assert "trial" in caught.value.message, "the message does not say which value it choked on"
+    assert listed.standing == "trial"
+    assert listed.raw["standing"] == "trial"
 
 
 def _timed(call: Callable[[], Any], bound: LoopBound | None = None) -> tuple[float, Any]:

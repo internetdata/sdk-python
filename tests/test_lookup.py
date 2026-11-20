@@ -664,9 +664,9 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
         "lookup_asn",
         {**ASN, "hosted_domains": {"domains": []}},
     ),
-    "the entitlement's tier unknown": (
+    "the entitlement's tier as a number": (
         "my_entitlement",
-        {**ENTITLEMENT, "plan": {"key": "max", "name": "Max", "tier": "platinum"}},
+        {**ENTITLEMENT, "plan": {"key": "max", "name": "Max", "tier": 3}},
     ),
     "the entitlement's org_id not a UUID": ("my_entitlement", {**ENTITLEMENT, "org_id": "x"}),
     "the entitlement's window_start not RFC 3339": (

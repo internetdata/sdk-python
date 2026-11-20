@@ -364,6 +364,19 @@ result.trial_expired is True   # a free-plan key's trial is spent
 result.cap_reached is True     # a paid key is past its overage cap
 ```
 
+### A value the API adds
+
+From 2.16.0, a plan's `tier`, a database's `standing` and `license_type`, a version's `formats` and a download's `outcome` and `format` read a value the API adds later as the string served, rather than failing the call. Compare against the values you know and keep a fallback:
+
+```python
+if family.standing == "licensed":
+    ...  # download it
+elif family.standing not in STANDINGS:
+    ...  # a standing this release does not know yet
+```
+
+A request still names only the formats in `DATABASE_FORMATS`, and any other is refused before anything is sent.
+
 ## Other Libraries
 
 There are official InternetData client libraries available for many languages including PHP, Python, Go, Java, and Ruby. See our GitHub at https://github.com/internetdata for more.
