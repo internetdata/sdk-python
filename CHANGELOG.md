@@ -2,6 +2,16 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.16.0 - 2026-11-20
+
+### Features
+
+- Read a tier, standing, license type, format or outcome the API adds as served ([`6108dd1`](https://github.com/internetdata/sdk-python/commit/6108dd109ad26fc548718c4a77198f0848e1e2d4))
+
+### Fixes
+
+- Re-pin the spec to 2026.11.20: reworded descriptions, the free trial without a period ([`028a776`](https://github.com/internetdata/sdk-python/commit/028a776ae329a8d6df9b9cf83e32c75075592e7b))
+
 ## 2.15.2 - 2026-11-19
 
 ### Fixes
