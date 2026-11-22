@@ -123,6 +123,28 @@ def test_a_network_type_condition_blocks_on_every_plan() -> None:
     assert lookup is not None and lookup.blocked is True
 
 
+def test_a_bot_condition_blocks_a_bot_and_passes_an_address_that_is_none() -> None:
+    """`is_bot` is on every plan's answer and `bot` on a paid one's, so either can be a
+    condition: a verified crawler blocks, an Unlimited answer for an address no bot uses
+    passes."""
+    bot = ANSWERS["paid-bot"]
+    blocking = _core(client=_serving(bot), block_condition={"is_bot": True})
+    lookup = blocking.evaluate(Req(ip=bot["ip"]))
+    assert lookup is not None and lookup.blocked is True
+    assert lookup.result is not None and lookup.result.bot is not None
+    assert lookup.result.bot.verified is True
+
+    by_operator = _core(
+        client=_serving(bot), block_condition={"bot": {"provider": "google", "verified": True}}
+    )
+    lookup = by_operator.evaluate(Req(ip=bot["ip"]))
+    assert lookup is not None and lookup.blocked is True
+
+    passing = _core(client=_serving(UNLIMITED), block_condition={"is_bot": True})
+    lookup = passing.evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
+
+
 def test_skip_claims_the_request() -> None:
     core = _core(client=_serving(UNLIMITED), skip=lambda _: True)
     assert core.evaluate(Req()) is None

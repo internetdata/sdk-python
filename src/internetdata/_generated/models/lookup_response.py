@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from ..models.abuse_contact import AbuseContact
     from ..models.asn import Asn
     from ..models.bit_torrent_detail import BitTorrentDetail
+    from ..models.bot_detail import BotDetail
     from ..models.carrier_detail import CarrierDetail
     from ..models.class_detail import ClassDetail
     from ..models.company import Company
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from ..models.satellite_detail import SatelliteDetail
     from ..models.smtp_detail import SmtpDetail
     from ..models.ssh_detail import SshDetail
+    from ..models.user_agent_verdict import UserAgentVerdict
     from ..models.web_detail import WebDetail
     from ..models.whois import Whois
 
@@ -40,6 +42,9 @@ class LookupResponse:
         is_bogon (bool): Reserved space, answered from the address alone.
         is_tor (bool): In Tor IP: a Tor exit.
         is_relay (bool): In Relay IP: an anonymizing relay such as iCloud Private Relay.
+        is_bot (bool): In Bot IP: an automated client's address, such as a search engine's or an AI company's crawler,
+            an uptime monitor, an internet scanner or a webhook sender. `bot` says whose, what it does and whether its
+            operator vouches for the address.
         is_anycast (bool): In Anycast IP: announced from many places at once.
         is_carrier (bool): In Carrier IP: a mobile carrier's address space.
         is_satellite (bool): In Satellite IP: a satellite operator's address space.
@@ -71,6 +76,7 @@ class LookupResponse:
         pubproxy (PubproxyDetail | Unset):
         hosting (ClassDetail | Unset):
         cdn (ClassDetail | Unset):
+        bot (BotDetail | Unset):
         carrier (CarrierDetail | Unset):
         satellite (SatelliteDetail | Unset):
         ssh (SshDetail | Unset):
@@ -83,6 +89,7 @@ class LookupResponse:
         rwhois (Rwhois | Unset): IP RWHOIS's most specific network covering the address. Paid plans and the trial.
         hosted_domains (HostedDomains | Unset): From IP Hosted Domains: how many registered domains resolve to the
             address, and the 10 most popular. Its database lists up to 1,000 an address. Paid plans and the trial.
+        user_agent (UserAgentVerdict | Unset):
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
             organization's trial of every field lasts, `true` once the answer has Unlimited's fields.
         cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer
@@ -94,6 +101,7 @@ class LookupResponse:
     is_bogon: bool
     is_tor: bool
     is_relay: bool
+    is_bot: bool
     is_anycast: bool
     is_carrier: bool
     is_satellite: bool
@@ -123,6 +131,7 @@ class LookupResponse:
     pubproxy: PubproxyDetail | Unset = UNSET
     hosting: ClassDetail | Unset = UNSET
     cdn: ClassDetail | Unset = UNSET
+    bot: BotDetail | Unset = UNSET
     carrier: CarrierDetail | Unset = UNSET
     satellite: SatelliteDetail | Unset = UNSET
     ssh: SshDetail | Unset = UNSET
@@ -133,6 +142,7 @@ class LookupResponse:
     whois: Whois | Unset = UNSET
     rwhois: Rwhois | Unset = UNSET
     hosted_domains: HostedDomains | Unset = UNSET
+    user_agent: UserAgentVerdict | Unset = UNSET
     trial_expired: bool | Unset = UNSET
     cap_reached: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -145,6 +155,8 @@ class LookupResponse:
         is_tor = self.is_tor
 
         is_relay = self.is_relay
+
+        is_bot = self.is_bot
 
         is_anycast = self.is_anycast
 
@@ -218,6 +230,10 @@ class LookupResponse:
         if not isinstance(self.cdn, Unset):
             cdn = self.cdn.to_dict()
 
+        bot: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.bot, Unset):
+            bot = self.bot.to_dict()
+
         carrier: dict[str, Any] | Unset = UNSET
         if not isinstance(self.carrier, Unset):
             carrier = self.carrier.to_dict()
@@ -261,6 +277,10 @@ class LookupResponse:
         if not isinstance(self.hosted_domains, Unset):
             hosted_domains = self.hosted_domains.to_dict()
 
+        user_agent: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.user_agent, Unset):
+            user_agent = self.user_agent.to_dict()
+
         trial_expired = self.trial_expired
 
         cap_reached = self.cap_reached
@@ -273,6 +293,7 @@ class LookupResponse:
                 "is_bogon": is_bogon,
                 "is_tor": is_tor,
                 "is_relay": is_relay,
+                "is_bot": is_bot,
                 "is_anycast": is_anycast,
                 "is_carrier": is_carrier,
                 "is_satellite": is_satellite,
@@ -318,6 +339,8 @@ class LookupResponse:
             field_dict["hosting"] = hosting
         if cdn is not UNSET:
             field_dict["cdn"] = cdn
+        if bot is not UNSET:
+            field_dict["bot"] = bot
         if carrier is not UNSET:
             field_dict["carrier"] = carrier
         if satellite is not UNSET:
@@ -338,6 +361,8 @@ class LookupResponse:
             field_dict["rwhois"] = rwhois
         if hosted_domains is not UNSET:
             field_dict["hosted_domains"] = hosted_domains
+        if user_agent is not UNSET:
+            field_dict["user_agent"] = user_agent
         if trial_expired is not UNSET:
             field_dict["trial_expired"] = trial_expired
         if cap_reached is not UNSET:
@@ -350,6 +375,7 @@ class LookupResponse:
         from ..models.abuse_contact import AbuseContact
         from ..models.asn import Asn
         from ..models.bit_torrent_detail import BitTorrentDetail
+        from ..models.bot_detail import BotDetail
         from ..models.carrier_detail import CarrierDetail
         from ..models.class_detail import ClassDetail
         from ..models.company import Company
@@ -362,6 +388,7 @@ class LookupResponse:
         from ..models.satellite_detail import SatelliteDetail
         from ..models.smtp_detail import SmtpDetail
         from ..models.ssh_detail import SshDetail
+        from ..models.user_agent_verdict import UserAgentVerdict
         from ..models.web_detail import WebDetail
         from ..models.whois import Whois
 
@@ -373,6 +400,8 @@ class LookupResponse:
         is_tor = d.pop("is_tor")
 
         is_relay = d.pop("is_relay")
+
+        is_bot = d.pop("is_bot")
 
         is_anycast = d.pop("is_anycast")
 
@@ -467,6 +496,13 @@ class LookupResponse:
         else:
             cdn = ClassDetail.from_dict(_cdn)
 
+        _bot = d.pop("bot", UNSET)
+        bot: BotDetail | Unset
+        if isinstance(_bot, Unset):
+            bot = UNSET
+        else:
+            bot = BotDetail.from_dict(_bot)
+
         _carrier = d.pop("carrier", UNSET)
         carrier: CarrierDetail | Unset
         if isinstance(_carrier, Unset):
@@ -539,6 +575,13 @@ class LookupResponse:
         else:
             hosted_domains = HostedDomains.from_dict(_hosted_domains)
 
+        _user_agent = d.pop("user_agent", UNSET)
+        user_agent: UserAgentVerdict | Unset
+        if isinstance(_user_agent, Unset):
+            user_agent = UNSET
+        else:
+            user_agent = UserAgentVerdict.from_dict(_user_agent)
+
         trial_expired = d.pop("trial_expired", UNSET)
 
         cap_reached = d.pop("cap_reached", UNSET)
@@ -548,6 +591,7 @@ class LookupResponse:
             is_bogon=is_bogon,
             is_tor=is_tor,
             is_relay=is_relay,
+            is_bot=is_bot,
             is_anycast=is_anycast,
             is_carrier=is_carrier,
             is_satellite=is_satellite,
@@ -577,6 +621,7 @@ class LookupResponse:
             pubproxy=pubproxy,
             hosting=hosting,
             cdn=cdn,
+            bot=bot,
             carrier=carrier,
             satellite=satellite,
             ssh=ssh,
@@ -587,6 +632,7 @@ class LookupResponse:
             whois=whois,
             rwhois=rwhois,
             hosted_domains=hosted_domains,
+            user_agent=user_agent,
             trial_expired=trial_expired,
             cap_reached=cap_reached,
         )

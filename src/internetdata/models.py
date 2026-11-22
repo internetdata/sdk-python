@@ -31,6 +31,7 @@ __all__ = [
     "AsnPrefix",
     "AsnResult",
     "BitTorrentDetail",
+    "BotDetail",
     "CarrierDetail",
     "ClassDetail",
     "CohostedDomains",
@@ -77,6 +78,7 @@ __all__ = [
     "SshDetail",
     "Standing",
     "TokenResponse",
+    "UserAgentVerdict",
     "WebDetail",
     "Whois",
 ]
@@ -414,6 +416,16 @@ def _date_time(value: Any, name: str) -> datetime.datetime:
 # and no". Each type is frozen, because a cached answer is handed to every later caller of
 # the same address. Read by `_record`, member by member, from the type each field names.
 
+#: Marks a member the spec requires that still has a default, so building the type by hand
+#: without it keeps working: `_record` refuses an answer where it is absent or null.
+_REQUIRED: dict[str, bool] = {"required": True}
+
+
+def _wire_required(member: dataclasses.Field[Any]) -> bool:
+    """Whether an answer must carry `member`: it has no default, or it is marked `_REQUIRED`."""
+    return member.default is dataclasses.MISSING or bool(member.metadata.get("required"))
+
+
 Flag = Literal[
     "is_vpn",
     "is_tor",
@@ -432,6 +444,7 @@ Flag = Literal[
     "is_web",
     "is_dns_resolver",
     "is_bittorrent",
+    "is_bot",
 ]
 
 EntitlementPlanTier = Literal["free", "starter", "scale", "max"]
@@ -575,6 +588,43 @@ class BitTorrentDetail:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class BotDetail:
+    """Whose bot uses the address, from Bot IP, on a paid plan's answers. Empty (every field
+    `None`) when `is_bot` is false.
+
+    `agents` names the bots the address serves as their user agents name them, or, for an
+    address that is not verified, the bots it claimed to be, and `categories` what they do:
+    both in the order served, empty where none is known. `verified` is whether the operator
+    vouches for the address, and `verified_by` how, the empty string when it does not.
+    """
+
+    provider: str | None = None
+    provider_name: str | None = None
+    agents: tuple[str, ...] | None = None
+    categories: tuple[str, ...] | None = None
+    verified: bool | None = None
+    identity: str | None = None
+    verified_by: str | None = None
+    confidence: str | None = None
+    first_seen: str | None = None
+    last_seen: str | None = None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UserAgentVerdict:
+    """The agent a request's user agent names, and whether the address bears it out. Only on
+    an answer to a lookup that sent a user agent, which this release never does."""
+
+    #: The agent it names, such as `Googlebot` or `Chrome`; `Unknown` where it names none.
+    agent: str
+    #: `browser`, `inapp`, `automation`, `bot`, `ai-bot`, `http-client` or `unknown`.
+    kind: str
+    #: `verified`, `spoofed`, `unverifiable` or `not_bot`. One the API adds after this
+    #: release comes back as the string served.
+    verdict: Literal["verified", "spoofed", "unverifiable", "not_bot"]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Location:
     """Where the address is, on every answer. A field is the empty string where it is not
     known, and None where your plan does not include it."""
@@ -611,8 +661,11 @@ class Asn:
     domain: str
     type: str
     prefix: str
-    country: str | None = None
-    rpki_status: str | None = None
+    #: On every answer. Typed optional so an `Asn` built by hand without it still builds;
+    #: an answer without it is refused, as the spec requires it.
+    country: str | None = field(default=None, metadata=_REQUIRED)
+    #: As `country`.
+    rpki_status: str | None = field(default=None, metadata=_REQUIRED)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -746,6 +799,16 @@ class Result:
     #: once its organization's overage cap is reached and the answer has Unlimited's. Lookups
     #: answered past the cap are not billed.
     cap_reached: bool | None = None
+
+    #: On every plan's answers: whether an automated client, a crawler, a monitor, a scanner
+    #: or a webhook sender, uses the address. An answer without it is refused; the default
+    #: is only for a `Result` built by hand.
+    is_bot: bool = field(default=False, metadata=_REQUIRED)
+    #: Whose bot it is, on a paid plan's answers (and the trial's): empty when `is_bot` is
+    #: false, None where your plan does not include it.
+    bot: BotDetail | None = None
+    #: Only on an answer to a lookup that sent a user agent, which this release never does.
+    user_agent: UserAgentVerdict | None = None
 
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -1070,7 +1133,7 @@ def _record(cls: type[R], body: Any, name: str) -> R:
             values["raw"] = body
             continue
         wire = f"{name}.{member.name}"
-        required = member.default is dataclasses.MISSING
+        required = _wire_required(member)
         if member.name not in body:
             if required:
                 raise KeyError(wire)
@@ -1078,7 +1141,7 @@ def _record(cls: type[R], body: Any, name: str) -> R:
         value = body[member.name]
         arms = _arms(hints[member.name])
         if value is None:
-            if type(None) not in arms:
+            if type(None) not in arms or member.metadata.get("required"):
                 raise ValueError(f"{wire} is null")
             values[member.name] = None
             continue

@@ -49,6 +49,8 @@ from internetdata import (
 from internetdata._generated.models.entitlement_plan_tier import (
     EntitlementPlanTier as WireEntitlementPlanTier,
 )
+from internetdata.bogon import bogon_result
+from internetdata.models import Asn, _wire_required, to_result
 
 # Enough addresses for seven chunks of the batch endpoint's 1000, so a concurrency bound
 # has something to bound: one request per chunk, and only the chunks overlap.
@@ -577,6 +579,18 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     "is_vpn a number": ("lookup", answer("8.8.8.8", is_vpn=1)),
     "cap_reached a string": ("lookup", answer("8.8.8.8", cap_reached="true")),
     "tor null": ("lookup", answer("8.8.8.8", tor=None)),
+    "is_bot absent": (
+        "lookup",
+        {key: value for key, value in answer("8.8.8.8").items() if key != "is_bot"},
+    ),
+    "is_bot null": ("lookup", answer("8.8.8.8", is_bot=None)),
+    "is_bot a string": ("lookup", answer("8.8.8.8", is_bot="false")),
+    "bot a list": ("lookup", answer("8.8.8.8", is_bot=False, bot=[])),
+    "a bot's agents a string": ("lookup", answer("8.8.8.8", is_bot=True, bot={"agents": "x"})),
+    "the asn's country null": (
+        "lookup",
+        answer("8.8.8.8", asn={**answer("x")["asn"], "country": None}),
+    ),
     "tor a list": ("lookup", answer("8.8.8.8", tor=[])),
     "a proxy's hits a numeric string": (
         "lookup",
@@ -714,6 +728,47 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
         },
     ),
 }
+
+
+# Members the spec requires that keep a default, so a type built by hand without them still
+# builds. A batch entry skips the generated decoder, so `to_result` alone must refuse them.
+REQUIRED_WITH_A_DEFAULT: dict[str, dict[str, Any]] = {
+    "is_bot absent": {key: value for key, value in answer("8.8.8.8").items() if key != "is_bot"},
+    "is_bot null": answer("8.8.8.8", is_bot=None),
+    "the asn's country absent": answer(
+        "8.8.8.8", asn={k: v for k, v in answer("x")["asn"].items() if k != "country"}
+    ),
+    "the asn's rpki_status absent": answer(
+        "8.8.8.8", asn={k: v for k, v in answer("x")["asn"].items() if k != "rpki_status"}
+    ),
+    "the asn's rpki_status null": answer(
+        "8.8.8.8", asn={**answer("x")["asn"], "rpki_status": None}
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    "body", list(REQUIRED_WITH_A_DEFAULT.values()), ids=list(REQUIRED_WITH_A_DEFAULT)
+)
+def test_an_answer_without_a_required_member_that_has_a_default_is_refused(
+    body: dict[str, Any],
+) -> None:
+    with pytest.raises((KeyError, ValueError)):
+        to_result(body)
+
+
+def test_a_result_and_an_asn_built_by_hand_need_none_of_the_members_added_since_2_17() -> None:
+    """`is_bot`, `bot` and `user_agent` are new, and the AS's `country` and `rpki_status`
+    became required in the spec: building either type by hand without them still builds."""
+    asn = Asn(asn=0, name="", domain="", type="", prefix="")
+    assert (asn.country, asn.rpki_status) == (None, None)
+    bogon = bogon_result("10.0.0.1")
+    added = {"is_bot", "bot", "user_agent"}
+    kept = {
+        f.name: getattr(bogon, f.name) for f in dataclasses.fields(Result) if f.name not in added
+    }
+    built = Result(**kept)
+    assert (built.is_bot, built.bot, built.user_agent) == (False, None, None)
 
 
 @pytest.mark.parametrize("case", list(MALFORMED.values()), ids=list(MALFORMED))
@@ -865,6 +920,8 @@ LOOKUP_MODELS = {
     "WebDetail": "web_detail.WebDetail",
     "DnsResolverDetail": "dns_resolver_detail.DnsResolverDetail",
     "BitTorrentDetail": "bit_torrent_detail.BitTorrentDetail",
+    "BotDetail": "bot_detail.BotDetail",
+    "UserAgentVerdict": "user_agent_verdict.UserAgentVerdict",
     "Location": "location.Location",
     "Asn": "asn.Asn",
     "Company": "company.Company",
@@ -912,7 +969,7 @@ def test_every_member_the_pinned_spec_serves_is_on_the_lookup_model(name: str) -
 
     assert set(served) == set(modeled), f"{name} and the spec disagree on its members"
     required = {key for key, f in served.items() if f.default is attrs.NOTHING}
-    assert required == {key for key, f in modeled.items() if f.default is dataclasses.MISSING}, (
+    assert required == {key for key, f in modeled.items() if _wire_required(f)}, (
         f"{name}: what the spec requires is not what the model requires"
     )
 

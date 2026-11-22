@@ -8,18 +8,27 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.lookup_error import LookupError_
 from ...models.lookup_response import LookupResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     ip: str,
+    *,
+    user_agent: str | Unset = UNSET,
 ) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    params["user_agent"] = user_agent
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/{ip}".format(
             ip=quote(str(ip), safe=""),
         ),
+        "params": params,
     }
 
     return _kwargs
@@ -79,6 +88,7 @@ def sync_detailed(
     ip: str,
     *,
     client: AuthenticatedClient,
+    user_agent: str | Unset = UNSET,
 ) -> Response[LookupError_ | LookupResponse]:
     """IP lookup
 
@@ -91,6 +101,7 @@ def sync_detailed(
 
     Args:
         ip (str):
+        user_agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -102,6 +113,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         ip=ip,
+        user_agent=user_agent,
     )
 
     response = client.get_httpx_client().request(
@@ -115,6 +127,7 @@ def sync(
     ip: str,
     *,
     client: AuthenticatedClient,
+    user_agent: str | Unset = UNSET,
 ) -> LookupError_ | LookupResponse | None:
     """IP lookup
 
@@ -127,6 +140,7 @@ def sync(
 
     Args:
         ip (str):
+        user_agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -139,6 +153,7 @@ def sync(
     return sync_detailed(
         ip=ip,
         client=client,
+        user_agent=user_agent,
     ).parsed
 
 
@@ -146,6 +161,7 @@ async def asyncio_detailed(
     ip: str,
     *,
     client: AuthenticatedClient,
+    user_agent: str | Unset = UNSET,
 ) -> Response[LookupError_ | LookupResponse]:
     """IP lookup
 
@@ -158,6 +174,7 @@ async def asyncio_detailed(
 
     Args:
         ip (str):
+        user_agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -169,6 +186,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         ip=ip,
+        user_agent=user_agent,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -180,6 +198,7 @@ async def asyncio(
     ip: str,
     *,
     client: AuthenticatedClient,
+    user_agent: str | Unset = UNSET,
 ) -> LookupError_ | LookupResponse | None:
     """IP lookup
 
@@ -192,6 +211,7 @@ async def asyncio(
 
     Args:
         ip (str):
+        user_agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -205,5 +225,6 @@ async def asyncio(
         await asyncio_detailed(
             ip=ip,
             client=client,
+            user_agent=user_agent,
         )
     ).parsed

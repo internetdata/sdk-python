@@ -72,6 +72,8 @@ def sync_detailed(
     kept, so `reveal` will refuse it permanently; rotating produces one
     that can be read.
 
+    Needs the `apikeys.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -106,6 +108,8 @@ def sync(
     kept, so `reveal` will refuse it permanently; rotating produces one
     that can be read.
 
+    Needs the `apikeys.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -135,6 +139,8 @@ async def asyncio_detailed(
     A key issued before this product stored secrets recoverably was never
     kept, so `reveal` will refuse it permanently; rotating produces one
     that can be read.
+
+    Needs the `apikeys.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -167,6 +173,8 @@ async def asyncio(
     A key issued before this product stored secrets recoverably was never
     kept, so `reveal` will refuse it permanently; rotating produces one
     that can be read.
+
+    Needs the `apikeys.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

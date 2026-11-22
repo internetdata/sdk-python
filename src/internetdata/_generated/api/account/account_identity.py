@@ -75,6 +75,8 @@ def sync_detailed(
     so a client can render its own capabilities rather than discovering
     them from a 403.
 
+    Needs the `account.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -112,6 +114,8 @@ def sync(
     so a client can render its own capabilities rather than discovering
     them from a 403.
 
+    Needs the `account.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -144,6 +148,8 @@ async def asyncio_detailed(
     a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
+
+    Needs the `account.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,6 +185,8 @@ async def asyncio(
     a profile. The `scopes` array is what the credential may do right now,
     so a client can render its own capabilities rather than discovering
     them from a 403.
+
+    Needs the `account.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

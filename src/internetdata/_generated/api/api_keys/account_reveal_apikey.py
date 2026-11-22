@@ -83,6 +83,8 @@ def sync_detailed(
     stored secrets recoverably - that secret was never kept, so no retry
     will ever produce it. Rotate the key instead.
 
+    Needs the `apikeys.reveal` scope.
+
     Args:
         id (UUID):
 
@@ -122,6 +124,8 @@ def sync(
     stored secrets recoverably - that secret was never kept, so no retry
     will ever produce it. Rotate the key instead.
 
+    Needs the `apikeys.reveal` scope.
+
     Args:
         id (UUID):
 
@@ -155,6 +159,8 @@ async def asyncio_detailed(
     Refused with `NOT_RETRIEVABLE` for a key issued before this product
     stored secrets recoverably - that secret was never kept, so no retry
     will ever produce it. Rotate the key instead.
+
+    Needs the `apikeys.reveal` scope.
 
     Args:
         id (UUID):
@@ -192,6 +198,8 @@ async def asyncio(
     Refused with `NOT_RETRIEVABLE` for a key issued before this product
     stored secrets recoverably - that secret was never kept, so no retry
     will ever produce it. Rotate the key instead.
+
+    Needs the `apikeys.reveal` scope.
 
     Args:
         id (UUID):

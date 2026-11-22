@@ -65,6 +65,8 @@ def sync_detailed(
 
     Modeling it as one here would promise something this API does not do.
 
+    Needs the `org.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -93,6 +95,8 @@ def sync(
 
     Modeling it as one here would promise something this API does not do.
 
+    Needs the `org.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -116,6 +120,8 @@ async def asyncio_detailed(
     emailed invitation in the console, not an API call.
 
     Modeling it as one here would promise something this API does not do.
+
+    Needs the `org.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -142,6 +148,8 @@ async def asyncio(
     emailed invitation in the console, not an API call.
 
     Modeling it as one here would promise something this API does not do.
+
+    Needs the `org.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

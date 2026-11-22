@@ -9,6 +9,7 @@ from .models import (
     AbuseContact,
     Asn,
     BitTorrentDetail,
+    BotDetail,
     CarrierDetail,
     ClassDetail,
     Company,
@@ -157,6 +158,8 @@ def bogon_result(ip: str) -> Result:
         ),
         rwhois=Rwhois(id="", name="", country="", source="", domain="", abuse_email=""),
         hosted_domains=HostedDomains(total=0, domains=()),
+        is_bot=False,
+        bot=BotDetail(),
         raw={},
     )
 

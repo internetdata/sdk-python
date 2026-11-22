@@ -6,8 +6,6 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="Asn")
 
 
@@ -21,8 +19,8 @@ class Asn:
         domain (str): Its operator's domain.
         type_ (str): The kind of network it runs.
         prefix (str): The announced prefix covering the address.
-        country (str | Unset): The country its registry assigned it to.
-        rpki_status (str | Unset): The announcement's RPKI status.
+        country (str): The country its registry assigned it to.
+        rpki_status (str): The announcement's RPKI status.
     """
 
     asn: int
@@ -30,8 +28,8 @@ class Asn:
     domain: str
     type_: str
     prefix: str
-    country: str | Unset = UNSET
-    rpki_status: str | Unset = UNSET
+    country: str
+    rpki_status: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,12 +56,10 @@ class Asn:
                 "domain": domain,
                 "type": type_,
                 "prefix": prefix,
+                "country": country,
+                "rpki_status": rpki_status,
             }
         )
-        if country is not UNSET:
-            field_dict["country"] = country
-        if rpki_status is not UNSET:
-            field_dict["rpki_status"] = rpki_status
 
         return field_dict
 
@@ -80,9 +76,9 @@ class Asn:
 
         prefix = d.pop("prefix")
 
-        country = d.pop("country", UNSET)
+        country = d.pop("country")
 
-        rpki_status = d.pop("rpki_status", UNSET)
+        rpki_status = d.pop("rpki_status")
 
         asn = cls(
             asn=asn,

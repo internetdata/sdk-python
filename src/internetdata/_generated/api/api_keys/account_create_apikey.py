@@ -80,6 +80,8 @@ def sync_detailed(
      Creates an API key and returns its secret, which no list ever shows:
     keep it, or reveal it again later.
 
+    Needs the `apikeys.manage` scope.
+
     Args:
         body (AccountCreateApikeyRequest):
 
@@ -112,6 +114,8 @@ def sync(
      Creates an API key and returns its secret, which no list ever shows:
     keep it, or reveal it again later.
 
+    Needs the `apikeys.manage` scope.
+
     Args:
         body (AccountCreateApikeyRequest):
 
@@ -138,6 +142,8 @@ async def asyncio_detailed(
 
      Creates an API key and returns its secret, which no list ever shows:
     keep it, or reveal it again later.
+
+    Needs the `apikeys.manage` scope.
 
     Args:
         body (AccountCreateApikeyRequest):
@@ -168,6 +174,8 @@ async def asyncio(
 
      Creates an API key and returns its secret, which no list ever shows:
     keep it, or reveal it again later.
+
+    Needs the `apikeys.manage` scope.
 
     Args:
         body (AccountCreateApikeyRequest):

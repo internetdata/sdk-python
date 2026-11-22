@@ -66,6 +66,8 @@ def sync_detailed(
 
     An identifier in the path could only ever be your own or a refusal.
 
+    Needs the `org.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -94,6 +96,8 @@ def sync(
 
     An identifier in the path could only ever be your own or a refusal.
 
+    Needs the `org.read` scope.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -117,6 +121,8 @@ async def asyncio_detailed(
     credential belongs to exactly one, so there is no ID to pass.
 
     An identifier in the path could only ever be your own or a refusal.
+
+    Needs the `org.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,6 +149,8 @@ async def asyncio(
     credential belongs to exactly one, so there is no ID to pass.
 
     An identifier in the path could only ever be your own or a refusal.
+
+    Needs the `org.read` scope.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
