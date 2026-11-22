@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.18.0 - 2026-11-22
+
+### Features
+
+- Read whether a bot uses an address, and whose: is_bot and bot ([`1a2895c`](https://github.com/internetdata/sdk-python/commit/1a2895cdab09086413b3daf8b95dc19c557a730b))
+
 ## 2.17.0 - 2026-11-20
 
 ### Features
