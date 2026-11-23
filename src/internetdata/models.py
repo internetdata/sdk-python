@@ -592,6 +592,8 @@ class BotDetail:
     """Whose bot uses the address, from Bot IP, on a paid plan's answers. Empty (every field
     `None`) when `is_bot` is false.
 
+    `provider` (its ID in Bot Provider) and `provider_name` name the bot's operator, or, for
+    an address that is not verified, the operator its claim named: empty where none is known.
     `agents` names the bots the address serves as their user agents name them, or, for an
     address that is not verified, the bots it claimed to be, and `categories` what they do:
     both in the order served, empty where none is known. `verified` is whether the operator
