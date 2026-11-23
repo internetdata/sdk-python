@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.18.1 - 2026-11-23
+
+### Fixes
+
+- Re-pin the spec to 2026.11.22: whose operator an unverified bot names ([`b01532f`](https://github.com/internetdata/sdk-python/commit/b01532ff5461314c248b5cc0baf54c9100287981))
+
 ## 2.18.0 - 2026-11-22
 
 ### Features
