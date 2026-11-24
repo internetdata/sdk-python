@@ -13,6 +13,7 @@ import math
 import re
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, get_args
 
 import attrs
@@ -984,3 +985,129 @@ def test_no_lookup_type_carries_a_mutable_list() -> None:
     for name in LOOKUP_MODELS:
         for member in dataclasses.fields(getattr(internetdata, name)):
             assert not re.search(r"\blist\[", str(member.type)), f"{name}.{member.name}"
+
+
+PINNED_SPEC = Path(__file__).resolve().parent.parent / "spec" / "openapi.yaml"
+
+# The seen days spec 2026.11.23 gives `format: date`. Each comes back as the string served,
+# and only an RFC 3339 full-date on a day its month has reads: anything else is the server's
+# failure, as a member of the wrong type is.
+NOT_A_DAY = [
+    "x",
+    "",
+    "tomorrow",
+    "2026-02-30",
+    "2026-13-01",
+    "2026-11-5",
+    " 2026-11-05",
+    "2026-11-05\n",
+    "2026-11-05T00:00:00Z",
+    "20261105",
+    "2026-W45-4",
+    "2026-11-0٥",
+]
+
+
+def _with_day(day: str) -> dict[str, tuple[str, dict[str, Any]]]:
+    return {
+        "hosting.last_seen": (
+            "lookup",
+            {**PAID, "ip": "8.8.8.8", "hosting": {**PAID["hosting"], "last_seen": day}},
+        ),
+        "web[0].first_seen": (
+            "lookup",
+            {**PAID, "ip": "8.8.8.8", "web": [{**PAID["web"][0], "first_seen": day}]},
+        ),
+        "bittorrent.last_seen": (
+            "lookup",
+            {**PAID, "ip": "8.8.8.8", "bittorrent": {**PAID["bittorrent"], "last_seen": day}},
+        ),
+        "prefixes[0].first_seen": (
+            "lookup_asn",
+            {**ASN, "prefixes": [{**ASN["prefixes"][0], "first_seen": day}]},
+        ),
+        "dns.mx[0].last_seen": (
+            "lookup_domain",
+            {
+                **DOMAIN,
+                "dns": {**DOMAIN["dns"], "mx": [{**DOMAIN["dns"]["mx"][0], "last_seen": day}]},
+            },
+        ),
+    }
+
+
+SEEN_DAY_MEMBERS = list(_with_day("2026-11-05"))
+
+
+@pytest.mark.parametrize("day", NOT_A_DAY)
+@pytest.mark.parametrize("where", SEEN_DAY_MEMBERS)
+def test_a_seen_day_that_is_no_full_date_is_the_servers_failure(
+    make_client: ClientFactory, monkeypatch: pytest.MonkeyPatch, where: str, day: str
+) -> None:
+    monkeypatch.setattr(_core, "_BACKOFF_BASE", 0.0)
+    name, body = _with_day(day)[where]
+    path, send = CALLS[name]
+    stub = Stub({path: {"body": body}})
+    client = make_client(transport=stub.transport, cache=False, retries=2)
+
+    with pytest.raises(InternetDataError) as caught:
+        send(client)
+
+    assert (caught.value.kind, caught.value.status) == ("server_error", 200), repr(caught.value)
+    assert len(stub.requests) == 3
+
+
+@pytest.mark.parametrize("where", SEEN_DAY_MEMBERS)
+def test_a_seen_day_comes_back_as_the_string_served(make_client: ClientFactory, where: str) -> None:
+    name, body = _with_day("2024-02-29")[where]
+    path, send = CALLS[name]
+    client = make_client(transport=Stub({path: {"body": body}}).transport)
+
+    result = send(client)
+
+    assert "2024-02-29" in repr(result)
+    assert "datetime.date" not in repr(result)
+
+
+def test_a_batch_entry_with_a_seen_day_that_is_no_full_date_is_that_addresss_error_alone(
+    make_client: ClientFactory,
+) -> None:
+    bad = {**PAID, "ip": "8.8.8.8", "hosting": {**PAID["hosting"], "last_seen": "2026-11-5"}}
+    body = {"results": {"8.8.8.8": bad, "1.1.1.1": answer("1.1.1.1")}}
+    stub = Stub({"/batch": {"raw": json.dumps(body).encode()}})
+    client = make_client(transport=stub.transport, cache=False, retries=2)
+
+    answers = client.lookup_batch(["8.8.8.8", "1.1.1.1"])
+
+    failed = answers["8.8.8.8"]
+    assert isinstance(failed, InternetDataError), repr(failed)
+    assert (failed.kind, failed.status) == ("server_error", 200)
+    assert isinstance(answers["1.1.1.1"], Result)
+
+
+def test_the_domains_web_last_seen_may_be_empty(make_client: ClientFactory) -> None:
+    """It stays a plain string in the spec: empty when the crawl holds no page."""
+    body = {**DOMAIN, "web": {**DOMAIN["web"], "last_seen": ""}}
+    path, send = CALLS["lookup_domain"]
+    client = make_client(transport=Stub({path: {"body": body}}).transport)
+
+    assert send(client).web.last_seen == ""
+
+
+@pytest.mark.parametrize("name", LOOKUP_MODELS)
+def test_every_day_the_pinned_spec_types_as_a_date_is_checked_as_one(name: str) -> None:
+    """The staleness pin on the seen days: a `format: date` member a re-pin adds to a lookup
+    type turns this red until the model checks its form."""
+    from ruamel.yaml import YAML
+
+    spec = YAML(typ="safe").load(PINNED_SPEC.read_text())
+    schema = spec["components"]["schemas"][LOOKUP_MODELS[name].split(".")[1]]
+    dated = {
+        member
+        for member, prop in schema.get("properties", {}).items()
+        if prop.get("format") == "date"
+    }
+    checked = {
+        f.name for f in dataclasses.fields(getattr(internetdata, name)) if f.metadata.get("day")
+    }
+    assert checked == dated, f"{name}: the days the spec types are not the days the model checks"

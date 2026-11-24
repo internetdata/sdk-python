@@ -420,6 +420,11 @@ def _date_time(value: Any, name: str) -> datetime.datetime:
 #: without it keeps working: `_record` refuses an answer where it is absent or null.
 _REQUIRED: dict[str, bool] = {"required": True}
 
+#: Marks a day the spec gives `format: date` that the type hands back as the served string:
+#: `_record` refuses one that is no RFC 3339 full-date on a day its month has, as it refuses
+#: a member of the wrong type, so a malformed day is the server's failure, never an answer.
+_DAY: dict[str, bool] = {"day": True}
+
 
 def _wire_required(member: dataclasses.Field[Any]) -> bool:
     """Whether an answer must carry `member`: it has no default, or it is marked `_REQUIRED`."""
@@ -461,7 +466,7 @@ class ClassDetail:
     provider: str | None = None
     provider_name: str | None = None
     confidence: str | None = None
-    last_seen: str | None = None
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -471,8 +476,8 @@ class ProxyDetail:
 
     provider: str | None = None
     provider_name: str | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
     hits: int | None = None
     hits_days_pct: int | None = None
     providers_num: int | None = None
@@ -488,7 +493,7 @@ class PubproxyDetail:
     protocols: tuple[str, ...] | None = None
     num_ports: int | None = None
     num_proxies: int | None = None
-    last_seen: str | None = None
+    last_seen: str | None = field(default=None, metadata=_DAY)
     last_usable: str | None = None
 
 
@@ -524,8 +529,8 @@ class SshDetail:
     banner: str | None = None
     host_key_fp: str | None = None
     session_ok: bool | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -535,8 +540,8 @@ class SmtpDetail:
     port: int | None = None
     banner: str | None = None
     session_ok: bool | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -555,8 +560,8 @@ class WebDetail:
     cert_issuer_dn: str
     cert_browser_trusted: bool
     tls_version: str
-    first_seen: str
-    last_seen: str
+    first_seen: str = field(metadata=_DAY)
+    last_seen: str = field(metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -567,8 +572,8 @@ class DnsResolverDetail:
     recursion_available: bool | None = None
     rcode: int | None = None
     answer_correct: bool | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -577,8 +582,8 @@ class BitTorrentDetail:
 
     verified: bool | None = None
     id_matches_ip: bool | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
     last_reachable: str | None = None
     days_seen: int | None = None
     num_ports: int | None = None
@@ -608,8 +613,8 @@ class BotDetail:
     identity: str | None = None
     verified_by: str | None = None
     confidence: str | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -831,7 +836,7 @@ class AsnPrefix:
     prefix: str
     peer_count: int
     rpki_status: str
-    first_seen: str
+    first_seen: str = field(metadata=_DAY)
     country: str
     size: int
     other_origins: tuple[int, ...]
@@ -892,7 +897,7 @@ class DnsAddressRecord:
     """An A or AAAA record."""
 
     ip: str
-    last_seen: str
+    last_seen: str = field(metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -901,7 +906,7 @@ class DnsMxRecord:
 
     priority: int
     host: str
-    last_seen: str
+    last_seen: str = field(metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -909,7 +914,7 @@ class DnsNsRecord:
     """An NS record."""
 
     host: str
-    last_seen: str
+    last_seen: str = field(metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -917,7 +922,7 @@ class DnsCnameRecord:
     """A CNAME record."""
 
     target: str
-    last_seen: str
+    last_seen: str = field(metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -957,8 +962,8 @@ class DisposableDetail:
 
     confidence: str | None = None
     providers: tuple[str, ...] | None = None
-    first_seen: str | None = None
-    last_seen: str | None = None
+    first_seen: str | None = field(default=None, metadata=_DAY)
+    last_seen: str | None = field(default=None, metadata=_DAY)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -999,7 +1004,7 @@ class DomainWeb:
     url: str
     title: str
     description: str
-    #: The day it was last read.
+    #: The day it was last read, empty when the crawl holds no page.
     last_seen: str
     links: DomainWebLinks
 
@@ -1149,6 +1154,8 @@ def _record(cls: type[R], body: Any, name: str) -> R:
             continue
         (kind,) = (arm for arm in arms if arm is not type(None))
         values[member.name] = _value(value, kind, wire)
+        if member.metadata.get("day"):
+            _date(values[member.name], wire)
     return cls(**values)
 
 

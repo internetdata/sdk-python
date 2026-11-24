@@ -22,7 +22,7 @@ class DomainWeb:
             url (str): The URL of the home page read.
             title (str): An English page's title.
             description (str): An English page's description.
-            last_seen (str): The day it was last read.
+            last_seen (str): The day it was last read, empty when the crawl holds no page.
             links (DomainWebLinks): The external hosts the home page links to.
     """
 

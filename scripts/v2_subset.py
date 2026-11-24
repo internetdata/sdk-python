@@ -46,6 +46,36 @@ KEEP_PATH_PREFIXES = (
 DROP_SECURITY_SCHEMES = ("ApiKeyAuth",)
 # Every components section that a `$ref` can point at in this spec.
 REF_SECTIONS = ("schemas", "parameters", "responses")
+# The seen days spec 2026.11.23 gave `format: date`. The answer types hand them back as the
+# served string, as they did before (a minor never changes what a member returns), and
+# `models` checks each is an RFC 3339 full-date; generated as `date`, the decoder would read
+# them with `isoparse`, which takes far more than a full-date. Each edit fails once the spec
+# stops matching it, so a moved member stops generation.
+SEEN_DAYS = (
+    ("ClassDetail", "last_seen"),
+    ("ProxyDetail", "first_seen"),
+    ("ProxyDetail", "last_seen"),
+    ("PubproxyDetail", "last_seen"),
+    ("BotDetail", "first_seen"),
+    ("BotDetail", "last_seen"),
+    ("SshDetail", "first_seen"),
+    ("SshDetail", "last_seen"),
+    ("SmtpDetail", "first_seen"),
+    ("SmtpDetail", "last_seen"),
+    ("WebDetail", "first_seen"),
+    ("WebDetail", "last_seen"),
+    ("DnsResolverDetail", "first_seen"),
+    ("DnsResolverDetail", "last_seen"),
+    ("BitTorrentDetail", "first_seen"),
+    ("BitTorrentDetail", "last_seen"),
+    ("AsnPrefix", "first_seen"),
+    ("DnsAddressRecord", "last_seen"),
+    ("DnsMxRecord", "last_seen"),
+    ("DnsNsRecord", "last_seen"),
+    ("DnsCnameRecord", "last_seen"),
+    ("DisposableDetail", "first_seen"),
+    ("DisposableDetail", "last_seen"),
+)
 
 
 def main(source: str, destination: str) -> int:
@@ -67,6 +97,13 @@ def main(source: str, destination: str) -> int:
     # Every kept operation names its own security, so a document-level default could only
     # name the dropped v1 scheme, which would leave the spec invalid.
     spec.pop("security", None)
+
+    schemas = components.get("schemas", {})
+    for schema, member in SEEN_DAYS:
+        prop = schemas.get(schema, {}).get("properties", {}).get(member, {})
+        if prop.get("format") != "date":
+            raise SystemExit(f"{schema}.{member} is no `format: date` member, so the spec moved")
+        del prop["format"]
 
     reachable = resolve_refs(spec, components)
     for section in REF_SECTIONS:
