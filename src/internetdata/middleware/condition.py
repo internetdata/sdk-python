@@ -23,7 +23,8 @@ __all__ = [
 #:
 #: A value may be a scalar (equality, strings without regard to case), a list meaning
 #: any-of, a dict of ``gte``/``gt``/``lte``/``lt`` bounding a number, or a nested
-#: condition. A member set to ``False`` or ``None`` is ignored entirely - a condition
+#: condition. Against a member the answer holds as a list, any one element matching is
+#: enough (``{"web": {"port": 443}}``). A member set to ``False`` or ``None`` is ignored entirely - a condition
 #: states the positive signals you act on, so there is no way to write "block when this
 #: is false", which would otherwise read as blocking everybody::
 #:
@@ -145,7 +146,13 @@ def _matches_value(want: Any, got: Any) -> bool:
     looks like. Every branch below must therefore reject it, which is what makes an
     unserved member fail a match rather than pass it. A new branch that does not would
     silently let a member nobody was served block a request.
+
+    A member the answer holds as a list (``web``'s rows, ``pubproxy.protocols``) matches
+    when ANY element matches the want, each element read by these same rules: an object
+    term must hold on one element. An empty list matches nothing.
     """
+    if isinstance(got, tuple):
+        return any(_matches_value(want, element) for element in got)
     if isinstance(want, (list, tuple, set, frozenset)):
         return any(_matches_value(entry, got) for entry in want)
     if isinstance(want, dict):
