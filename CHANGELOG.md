@@ -2,6 +2,16 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.19.0 - 2026-11-24
+
+### Features
+
+- Match a block condition against any element of a list member ([`6eee9da`](https://github.com/internetdata/sdk-python/commit/6eee9dac40b0c32c146c23f1e30b7ae757604649))
+
+### Fixes
+
+- Re-pin the spec to 2026.11.23: refuse a seen day that is no full-date ([`410424e`](https://github.com/internetdata/sdk-python/commit/410424e8feecd4398785460a436e336e6ce56dd4))
+
 ## 2.18.1 - 2026-11-23
 
 ### Fixes
