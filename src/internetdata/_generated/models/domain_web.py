@@ -15,8 +15,8 @@ T = TypeVar("T", bound="DomainWeb")
 
 @_attrs_define
 class DomainWeb:
-    """What our crawl last read of the domain's own home page, every member empty where it holds none. Paid plans and the
-    trial.
+    """What our crawl last read of the domain's own home page, every member empty where it holds none. On a paid plan or
+    the trial.
 
         Attributes:
             url (str): The URL of the home page read.

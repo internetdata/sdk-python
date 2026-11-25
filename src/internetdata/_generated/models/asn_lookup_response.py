@@ -28,30 +28,30 @@ class AsnLookupResponse:
         registry (str): The registry that allocated it.
         allocated (str): When.
         domain (str): Its operator's domain.
-        type_ (str | Unset): The kind of network it runs. Paid plans and the trial.
-        num_ips (int | Unset): IPv4 addresses it announces. Paid plans and the trial.
-        num_prefixes4 (int | Unset): IPv4 prefixes it announces. Paid plans and the trial.
-        num_prefixes6 (int | Unset): IPv6 prefixes it announces. Paid plans and the trial.
-        rpki_valid (int | Unset): Its announcements RPKI calls valid. Paid plans and the trial.
-        rpki_invalid (int | Unset): Invalid. Paid plans and the trial.
-        rpki_not_found (int | Unset): With no RPKI record. Paid plans and the trial.
+        type_ (str | Unset): The kind of network it runs. On a paid plan or the trial.
+        num_ips (int | Unset): IPv4 addresses it announces. On a paid plan or the trial.
+        num_prefixes4 (int | Unset): IPv4 prefixes it announces. On a paid plan or the trial.
+        num_prefixes6 (int | Unset): IPv6 prefixes it announces. On a paid plan or the trial.
+        rpki_valid (int | Unset): Its announcements RPKI calls valid. On a paid plan or the trial.
+        rpki_invalid (int | Unset): Invalid. On a paid plan or the trial.
+        rpki_not_found (int | Unset): With no RPKI record. On a paid plan or the trial.
         whois (AsnLookupResponseWhois | Unset): Its ASN Whois record, every column, empty where the registry states
-            nothing. Paid plans and the trial.
-        prefixes (list[AsnPrefix] | Unset): What it announces, IPv4 then IPv6, up to 20000 a family. Paid plans and the
-            trial.
-        rank (int | Unset): Its rank in ASN Extended, by customer cone, 1 the largest; `0` for an AS seen in no AS path.
-            Paid plans and the trial.
-        tier1 (bool | Unset): Whether it is one of the transit-free networks at the top of the hierarchy, which get
-            transit from no one and peer with each other. Paid plans and the trial.
-        num_upstreams (int | Unset): How many AS numbers it gets transit from. Paid plans and the trial.
-        upstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
-        num_peers (int | Unset): How many AS numbers it exchanges its own and its customers' routes with. Paid plans and
+            nothing. On a paid plan or the trial.
+        prefixes (list[AsnPrefix] | Unset): What it announces, IPv4 then IPv6, up to 20000 a family. On a paid plan or
             the trial.
-        peers (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
-        num_downstreams (int | Unset): How many AS numbers it provides transit to. Paid plans and the trial.
-        downstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. Paid plans and the trial.
+        rank (int | Unset): Its rank in ASN Extended, by customer cone, 1 the largest; `0` for an AS seen in no AS path.
+            On a paid plan or the trial.
+        tier1 (bool | Unset): Whether it is one of the transit-free networks at the top of the hierarchy, which get
+            transit from no one and peer with each other. On a paid plan or the trial.
+        num_upstreams (int | Unset): How many AS numbers it gets transit from. On a paid plan or the trial.
+        upstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. On a paid plan or the trial.
+        num_peers (int | Unset): How many AS numbers it exchanges its own and its customers' routes with. On a paid plan
+            or the trial.
+        peers (list[int] | Unset): Those AS numbers, ascending, up to 20000. On a paid plan or the trial.
+        num_downstreams (int | Unset): How many AS numbers it provides transit to. On a paid plan or the trial.
+        downstreams (list[int] | Unset): Those AS numbers, ascending, up to 20000. On a paid plan or the trial.
         hosted_domains (AsnHostedDomains | Unset): From ASN Hosted Domains: how many registered domains the AS hosts,
-            and the 10 most popular. Its database lists up to 1,000 an AS. Paid plans and the trial.
+            and the 10 most popular. Its database lists up to 1,000 an AS. On a paid plan or the trial.
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
             organization's trial of every field lasts, `true` once the answer has Unlimited's fields.
         cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer

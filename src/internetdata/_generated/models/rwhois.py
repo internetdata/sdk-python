@@ -11,7 +11,7 @@ T = TypeVar("T", bound="Rwhois")
 
 @_attrs_define
 class Rwhois:
-    """IP RWHOIS's most specific network covering the address. Paid plans and the trial.
+    """IP RWHOIS's most specific network covering the address. On a paid plan or the trial.
 
     Attributes:
         id (str): The network's identifier on the operator's RWHOIS server.

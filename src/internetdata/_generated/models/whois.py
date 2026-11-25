@@ -11,7 +11,7 @@ T = TypeVar("T", bound="Whois")
 
 @_attrs_define
 class Whois:
-    """IP Whois's most specific record covering the address. Paid plans and the trial.
+    """IP Whois's most specific record covering the address. On a paid plan or the trial.
 
     Attributes:
         id (str): Network name of the most specific record covering the address.

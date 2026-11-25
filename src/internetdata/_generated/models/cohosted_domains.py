@@ -12,7 +12,7 @@ T = TypeVar("T", bound="CohostedDomains")
 @_attrs_define
 class CohostedDomains:
     """From IP Hosted Domains: the other registered domains on the domain's first IPv4 address, how many and the 10 most
-    popular. Paid plans and the trial.
+    popular. On a paid plan or the trial.
 
         Attributes:
             ip (str): The domain's first IPv4 address, `''` where it has none.

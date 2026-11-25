@@ -18,9 +18,9 @@ class Company:
     Attributes:
         name (str): Who uses the address.
         domain (str): Their domain.
-        type_ (str | Unset): What kind of organization: hosting, isp, business, education, government. Paid plans and
+        type_ (str | Unset): What kind of organization: hosting, isp, business, education, government. On a paid plan or
             the trial.
-        country (str | Unset): ISO 3166 country code. Paid plans and the trial.
+        country (str | Unset): ISO 3166 country code. On a paid plan or the trial.
     """
 
     name: str

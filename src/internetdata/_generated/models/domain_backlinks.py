@@ -11,7 +11,7 @@ T = TypeVar("T", bound="DomainBacklinks")
 
 @_attrs_define
 class DomainBacklinks:
-    """The registered domains whose home page links to this one, how many and the 10 most popular. Paid plans and the
+    """The registered domains whose home page links to this one, how many and the 10 most popular. On a paid plan or the
     trial.
 
         Attributes:

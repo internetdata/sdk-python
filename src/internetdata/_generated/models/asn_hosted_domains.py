@@ -14,7 +14,7 @@ T = TypeVar("T", bound="AsnHostedDomains")
 @_attrs_define
 class AsnHostedDomains:
     """From ASN Hosted Domains: how many registered domains the AS hosts, and the 10 most popular. Its database lists up to
-    1,000 an AS. Paid plans and the trial.
+    1,000 an AS. On a paid plan or the trial.
 
         Attributes:
             total (int): How many registered domains resolve to an address the AS announces.

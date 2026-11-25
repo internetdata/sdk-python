@@ -60,15 +60,15 @@ class LookupResponse:
         company (Company): Who uses the address, from IP Company.
         hostname (str): The name the address's reverse DNS (PTR) record points to in IP RDNS, empty when it has none.
         abuse (AbuseContact): Where to report abuse, from IP Abuse Contact.
-        is_vpn (bool | Unset): In VPN IP: a VPN service's server. Paid plans and the trial.
-        is_resproxy (bool | Unset): In Residential Proxy IP's 90-day window: a residential proxy exit. Paid plans and
+        is_vpn (bool | Unset): In VPN IP: a VPN service's server. On a paid plan or the trial.
+        is_resproxy (bool | Unset): In Residential Proxy IP's 90-day window: a residential proxy exit. On a paid plan or
             the trial.
-        is_dcproxy (bool | Unset): In Datacenter Proxy IP's 90-day window. Paid plans and the trial.
-        is_mobproxy (bool | Unset): In Mobile Proxy IP's 90-day window. Paid plans and the trial.
-        is_pubproxy (bool | Unset): In Public Proxy IP: a public proxy listens here, or its traffic left from here. Paid
-            plans and the trial.
-        is_hosting (bool | Unset): In Hosting IP: a hosting or cloud network. Paid plans and the trial.
-        is_cdn (bool | Unset): In CDN IP: a content delivery network. Paid plans and the trial.
+        is_dcproxy (bool | Unset): In Datacenter Proxy IP's 90-day window. On a paid plan or the trial.
+        is_mobproxy (bool | Unset): In Mobile Proxy IP's 90-day window. On a paid plan or the trial.
+        is_pubproxy (bool | Unset): In Public Proxy IP: a public proxy listens here, or its traffic left from here. On a
+            paid plan or the trial.
+        is_hosting (bool | Unset): In Hosting IP: a hosting or cloud network. On a paid plan or the trial.
+        is_cdn (bool | Unset): In CDN IP: a content delivery network. On a paid plan or the trial.
         vpn (ClassDetail | Unset):
         resproxy (ProxyDetail | Unset):
         dcproxy (ProxyDetail | Unset):
@@ -81,14 +81,14 @@ class LookupResponse:
         satellite (SatelliteDetail | Unset):
         ssh (SshDetail | Unset):
         smtp (SmtpDetail | Unset):
-        web (list[WebDetail] | Unset): A row per port that answered, lowest first; `[]` when `is_web` is false. Paid
-            plans and the trial.
+        web (list[WebDetail] | Unset): A row per port that answered, lowest first; `[]` when `is_web` is false. On a
+            paid plan or the trial.
         dns_resolver (DnsResolverDetail | Unset):
         bittorrent (BitTorrentDetail | Unset):
-        whois (Whois | Unset): IP Whois's most specific record covering the address. Paid plans and the trial.
-        rwhois (Rwhois | Unset): IP RWHOIS's most specific network covering the address. Paid plans and the trial.
+        whois (Whois | Unset): IP Whois's most specific record covering the address. On a paid plan or the trial.
+        rwhois (Rwhois | Unset): IP RWHOIS's most specific network covering the address. On a paid plan or the trial.
         hosted_domains (HostedDomains | Unset): From IP Hosted Domains: how many registered domains resolve to the
-            address, and the 10 most popular. Its database lists up to 1,000 an address. Paid plans and the trial.
+            address, and the 10 most popular. Its database lists up to 1,000 an address. On a paid plan or the trial.
         user_agent (UserAgentVerdict | Unset):
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
             organization's trial of every field lasts, `true` once the answer has Unlimited's fields.

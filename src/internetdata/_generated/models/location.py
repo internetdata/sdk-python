@@ -26,17 +26,17 @@ class Location:
         currency_symbol (str): Currency symbol.
         flag_emoji (str): The country's flag.
         flag_unicode (str): Its code points, `U+1F1E6 U+1F1F9`.
-        region (str | Unset): Region (state or province). Paid plans and the trial.
-        region_code (str | Unset): ISO 3166-2 region code. Paid plans and the trial.
-        city (str | Unset): City. Paid plans and the trial.
-        postal_code (str | Unset): Postal code. Paid plans and the trial.
-        latitude (float | Unset): Latitude of the city. Paid plans and the trial.
-        longitude (float | Unset): Longitude of the city. Paid plans and the trial.
-        accuracy_radius (int | Unset): Radius in km holding the true location with 67% confidence. Paid plans and the
+        region (str | Unset): Region (state or province). On a paid plan or the trial.
+        region_code (str | Unset): ISO 3166-2 region code. On a paid plan or the trial.
+        city (str | Unset): City. On a paid plan or the trial.
+        postal_code (str | Unset): Postal code. On a paid plan or the trial.
+        latitude (float | Unset): Latitude of the city. On a paid plan or the trial.
+        longitude (float | Unset): Longitude of the city. On a paid plan or the trial.
+        accuracy_radius (int | Unset): Radius in km holding the true location with 67% confidence. On a paid plan or the
             trial.
-        geoname_id (str | Unset): GeoNames ID of the city. Paid plans and the trial.
-        dma_code (str | Unset): US TV market (DMA) code. Paid plans and the trial.
-        last_changed (str | Unset): The day the range's location last changed. Paid plans and the trial.
+        geoname_id (str | Unset): GeoNames ID of the city. On a paid plan or the trial.
+        dma_code (str | Unset): US TV market (DMA) code. On a paid plan or the trial.
+        last_changed (str | Unset): The day the range's location last changed. On a paid plan or the trial.
     """
 
     continent: str

@@ -11,8 +11,8 @@ T = TypeVar("T", bound="DomainRedirects")
 
 @_attrs_define
 class DomainRedirects:
-    """The registered domains whose home page redirects to this one, how many and the 10 most popular. Paid plans and the
-    trial.
+    """The registered domains whose home page redirects to this one, how many and the 10 most popular. On a paid plan or
+    the trial.
 
         Attributes:
             total (int): How many registered domains have a home page that redirects to this domain.

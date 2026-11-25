@@ -34,21 +34,21 @@ class DomainLookupResponse:
         has_mx (bool): MX records.
         has_ns (bool): NS records.
         has_cname (bool): A CNAME record.
-        is_disposable (bool | Unset): In Disposable Domain. Paid plans and the trial.
-        dns (DomainDns | Unset): Its records in Domain DNS, up to 100 a type. Paid plans and the trial.
+        is_disposable (bool | Unset): In Disposable Domain. On a paid plan or the trial.
+        dns (DomainDns | Unset): Its records in Domain DNS, up to 100 a type. On a paid plan or the trial.
         hosting (list[DomainHost] | Unset): The network announcing each address in `dns.a` and then `dns.aaaa`, from IP
-            ASN; `[]` where it resolves to none. Paid plans and the trial.
+            ASN; `[]` where it resolves to none. On a paid plan or the trial.
         cohosted_domains (CohostedDomains | Unset): From IP Hosted Domains: the other registered domains on the domain's
-            first IPv4 address, how many and the 10 most popular. Paid plans and the trial.
-        ip_ranges (DomainIpRanges | Unset): The organization's IP ranges, from Domain IP Ranges. Paid plans and the
+            first IPv4 address, how many and the 10 most popular. On a paid plan or the trial.
+        ip_ranges (DomainIpRanges | Unset): The organization's IP ranges, from Domain IP Ranges. On a paid plan or the
             trial.
         disposable (DisposableDetail | Unset):
         web (DomainWeb | Unset): What our crawl last read of the domain's own home page, every member empty where it
-            holds none. Paid plans and the trial.
+            holds none. On a paid plan or the trial.
         redirects (DomainRedirects | Unset): The registered domains whose home page redirects to this one, how many and
-            the 10 most popular. Paid plans and the trial.
+            the 10 most popular. On a paid plan or the trial.
         backlinks (DomainBacklinks | Unset): The registered domains whose home page links to this one, how many and the
-            10 most popular. Paid plans and the trial.
+            10 most popular. On a paid plan or the trial.
         trial_expired (bool | Unset): On every answer to a key on the free plan, and on no other: `false` while its
             organization's trial of every field lasts, `true` once the answer has Unlimited's fields.
         cap_reached (bool | Unset): On every answer to a key on a paid plan, and on no other: `false` while the answer

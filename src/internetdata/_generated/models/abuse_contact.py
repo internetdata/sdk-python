@@ -17,13 +17,13 @@ class AbuseContact:
 
     Attributes:
         email (str): Where to report abuse from the address.
-        name (str | Unset): The contact. Paid plans and the trial.
-        phone (str | Unset): Its phone number. Paid plans and the trial.
-        address (str | Unset): Its postal address. Paid plans and the trial.
-        country (str | Unset): ISO 3166 country code. Paid plans and the trial.
-        network (str | Unset): The registry block it was derived from. Paid plans and the trial.
-        validated (bool | Unset): ARIN reports the contact answered its yearly validation. Paid plans and the trial.
-        unvalidated_since (str | Unset): Since when it has not. Paid plans and the trial.
+        name (str | Unset): The contact. On a paid plan or the trial.
+        phone (str | Unset): Its phone number. On a paid plan or the trial.
+        address (str | Unset): Its postal address. On a paid plan or the trial.
+        country (str | Unset): ISO 3166 country code. On a paid plan or the trial.
+        network (str | Unset): The registry block it was derived from. On a paid plan or the trial.
+        validated (bool | Unset): ARIN reports the contact answered its yearly validation. On a paid plan or the trial.
+        unvalidated_since (str | Unset): Since when it has not. On a paid plan or the trial.
     """
 
     email: str

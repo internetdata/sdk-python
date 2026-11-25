@@ -15,7 +15,7 @@ T = TypeVar("T", bound="DomainIpRanges")
 
 @_attrs_define
 class DomainIpRanges:
-    """The organization's IP ranges, from Domain IP Ranges. Paid plans and the trial.
+    """The organization's IP ranges, from Domain IP Ranges. On a paid plan or the trial.
 
     Attributes:
         domain (str): The organization's domain.

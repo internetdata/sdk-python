@@ -14,7 +14,7 @@ T = TypeVar("T", bound="HostedDomains")
 @_attrs_define
 class HostedDomains:
     """From IP Hosted Domains: how many registered domains resolve to the address, and the 10 most popular. Its database
-    lists up to 1,000 an address. Paid plans and the trial.
+    lists up to 1,000 an address. On a paid plan or the trial.
 
         Attributes:
             total (int): How many registered domains resolve to the address.

@@ -11,7 +11,7 @@ T = TypeVar("T", bound="AsnLookupResponseWhois")
 
 @_attrs_define
 class AsnLookupResponseWhois:
-    """Its ASN Whois record, every column, empty where the registry states nothing. Paid plans and the trial."""
+    """Its ASN Whois record, every column, empty where the registry states nothing. On a paid plan or the trial."""
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
 

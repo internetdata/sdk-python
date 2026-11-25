@@ -18,7 +18,7 @@ T = TypeVar("T", bound="DomainDns")
 
 @_attrs_define
 class DomainDns:
-    """Its records in Domain DNS, up to 100 a type. Paid plans and the trial.
+    """Its records in Domain DNS, up to 100 a type. On a paid plan or the trial.
 
     Attributes:
         a (list[DnsAddressRecord]):
