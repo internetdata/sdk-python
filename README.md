@@ -39,7 +39,7 @@ with InternetData() as client:
 
 ### With an API key
 
-Every paid plan answers every field: the VPN, proxy, hosting and CDN flags, the detail behind each flag, the city, the Whois records and more. The plans differ only in how many lookups they include, and a free account tries every field. Create a key in the [console](https://app.internetdata.io), then pass it in:
+A paid plan answers every field: the VPN, proxy, hosting and CDN flags, the detail behind each flag, the city, the Whois records and more. Its quotas differ only in how many lookups they include, and a free account tries every field. Create a key in the [console](https://app.internetdata.io), then pass it in:
 
 ```python
 import os
@@ -82,8 +82,8 @@ Same answer `lookup` would give for that address, and the same cost against your
 
 ```python
 acct = client.my_entitlement()
-print(acct.plan.key)          # starter
-print(acct.plan.name)         # Starter, the name to show
+print(acct.plan.key)          # data_4
+print(acct.plan.name)         # Data, the name to show
 print(acct.usage.requests)    # 580
 print(acct.usage.window_end)  # when the allowance resets
 ```
