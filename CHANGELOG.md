@@ -2,6 +2,16 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.20.0 - 2026-11-25
+
+### Features
+
+- Send a user agent with a lookup, and let a verified crawler through the middleware ([`b967cc8`](https://github.com/internetdata/sdk-python/commit/b967cc8ad644d2fcec9d0679bd6b1009b6a245c9))
+
+### Fixes
+
+- Re-pin the spec to 2026.11.25: each paid field's description reads "On a paid plan or the trial." ([`7cc8be0`](https://github.com/internetdata/sdk-python/commit/7cc8be09fc514c255cabaf74197a0f141c572fdf))
+
 ## 2.19.0 - 2026-11-24
 
 ### Features
