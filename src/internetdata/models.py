@@ -620,7 +620,8 @@ class BotDetail:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class UserAgentVerdict:
     """The agent a request's user agent names, and whether the address bears it out. Only on
-    an answer to a lookup that sent a user agent, which this release never does."""
+    a paid plan's answer to a lookup that sent a user agent; a bogon, answered locally,
+    carries none."""
 
     #: The agent it names, such as `Googlebot` or `Chrome`; `Unknown` where it names none.
     agent: str
@@ -814,7 +815,8 @@ class Result:
     #: Whose bot it is, on a paid plan's answers (and the trial's): empty when `is_bot` is
     #: false, None where your plan does not include it.
     bot: BotDetail | None = None
-    #: Only on an answer to a lookup that sent a user agent, which this release never does.
+    #: On a paid plan's answer to a lookup that sent a user agent: whose bot it names, and
+    #: whether this address is it. None when no agent was sent or the plan lacks it.
     user_agent: UserAgentVerdict | None = None
 
     raw: dict[str, Any] = field(default_factory=dict)
