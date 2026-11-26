@@ -183,17 +183,33 @@ def keyed_client() -> tuple[InternetData, Recorder]:
     return InternetData(credential.key(), base_url=STAGING_API, transport=recorder), recorder
 
 
+# Held at their non-optional public type until the next major, so one left out reads False.
+HELD_FLAGS = (
+    "is_bot",
+    "is_carrier",
+    "is_satellite",
+    "is_ssh",
+    "is_smtp",
+    "is_web",
+    "is_dns_resolver",
+    "is_bittorrent",
+)
+
+
 def assert_read_as_served(value: Any, served: Any, where: str) -> None:
     """Every member `served` carries reached `value` as served, and every member it did not
-    carry reads as None. A member the API serves and this release does not model is the API
-    moving ahead of it, and is left alone."""
+    carry reads as None, a held flag as False. A member the API serves and this release does
+    not model is the API moving ahead of it, and is left alone."""
     for member in dataclasses.fields(value):
         if member.name == "raw":
             continue
         held = getattr(value, member.name)
         name = f"{where}.{member.name}"
         if member.name not in served:
-            assert held is None, f"{name} is not served, so it must read as None, not {held!r}"
+            if where == "answer" and member.name in HELD_FLAGS:
+                assert held is False, f"{name} is not served, so it must read as False"
+            else:
+                assert held is None, f"{name} is not served, so it must read as None, not {held!r}"
             continue
         wire = served[member.name]
         if dataclasses.is_dataclass(held):
