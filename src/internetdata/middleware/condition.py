@@ -60,7 +60,8 @@ def missing_members(condition: Conditions, result: Any) -> list[str]:
     is one.
 
     A locally answered bogon needs no special case: it is synthesized in the widest
-    shape, so every member is present and nothing reads as missing.
+    shape, so every member is present and nothing reads as missing. A flag the type holds
+    as False is missing when the served answer lacked it.
     """
     missing: list[str] = []
     for one in _as_list(condition):
@@ -114,12 +115,22 @@ def _collect_missing(
             continue
         path = f"{prefix}{member}"
         got = getattr(value, member, None)
-        if got is None:
+        if got is None or _left_out(value, member):
             if path not in missing:
                 missing.append(path)
             continue
         if isinstance(want, dict) and not _is_bound(want) and _populated(got):
             _collect_missing(want, got, f"{path}.", missing)
+
+
+def _left_out(value: Any, member: str) -> bool:
+    """Whether the served answer lacked a flag the type holds as False. The type reads it
+    False either way, so only the wire answer in `raw` tells; an answer with none (a bogon's,
+    or one built by hand) reads as it was built."""
+    fields = getattr(value, "__dataclass_fields__", {})
+    held = member in fields and fields[member].metadata.get("held")
+    raw = getattr(value, "raw", None)
+    return bool(held and raw and member not in raw)
 
 
 def _populated(value: Any) -> bool:

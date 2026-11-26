@@ -420,6 +420,10 @@ def _date_time(value: Any, name: str) -> datetime.datetime:
 #: without it keeps working: `_record` refuses an answer where it is absent or null.
 _REQUIRED: dict[str, bool] = {"required": True}
 
+#: Marks a flag Unlimited's answer no longer carries that keeps its non-optional `bool` until
+#: the next major: `_record` reads it absent as False, and still refuses a null or a non-bool.
+_HELD: dict[str, bool] = {"held": True}
+
 #: Marks a day the spec gives `format: date` that the type hands back as the served string:
 #: `_record` refuses one that is no RFC 3339 full-date on a day its month has, as it refuses
 #: a member of the wrong type, so a malformed day is the server's failure, never an answer.
@@ -427,7 +431,10 @@ _DAY: dict[str, bool] = {"day": True}
 
 
 def _wire_required(member: dataclasses.Field[Any]) -> bool:
-    """Whether an answer must carry `member`: it has no default, or it is marked `_REQUIRED`."""
+    """Whether an answer must carry `member`: it has no default, or it is marked `_REQUIRED`,
+    and it is not one of the `_HELD` flags, which an answer may leave out."""
+    if member.metadata.get("held"):
+        return False
     return member.default is dataclasses.MISSING or bool(member.metadata.get("required"))
 
 
@@ -747,6 +754,11 @@ class Result:
     the address is flagged. That holds inside a shared object too: `location.city` is
     None on a plan without it.
 
+    Eight flags are the exception until the next major: `is_bot`, `is_carrier`,
+    `is_satellite`, `is_ssh`, `is_smtp`, `is_web`, `is_dns_resolver` and `is_bittorrent`
+    stay plain `bool`s, and read False on an answer that leaves them out, as Unlimited's
+    does. `raw` holds the members the answer carried.
+
     A detail object that is present but empty (every field `None`, Web IP's an empty
     tuple) means the flag above it is false.
 
@@ -765,13 +777,15 @@ class Result:
     is_hosting: bool | None = None
     is_cdn: bool | None = None
     is_anycast: bool
-    is_carrier: bool
-    is_satellite: bool
-    is_ssh: bool
-    is_smtp: bool
-    is_web: bool
-    is_dns_resolver: bool
-    is_bittorrent: bool
+    #: `is_carrier` to `is_bittorrent`, and `is_bot` below, are on a paid plan or the trial. An
+    #: answer without one, as Unlimited's is, reads False here: `raw` says whether it carried it.
+    is_carrier: bool = field(metadata=_HELD)
+    is_satellite: bool = field(metadata=_HELD)
+    is_ssh: bool = field(metadata=_HELD)
+    is_smtp: bool = field(metadata=_HELD)
+    is_web: bool = field(metadata=_HELD)
+    is_dns_resolver: bool = field(metadata=_HELD)
+    is_bittorrent: bool = field(metadata=_HELD)
 
     vpn: ClassDetail | None = None
     tor: ClassDetail
@@ -808,10 +822,9 @@ class Result:
     #: answered past the cap are not billed.
     cap_reached: bool | None = None
 
-    #: On every plan's answers: whether an automated client, a crawler, a monitor, a scanner
-    #: or a webhook sender, uses the address. An answer without it is refused; the default
-    #: is only for a `Result` built by hand.
-    is_bot: bool = field(default=False, metadata=_REQUIRED)
+    #: Whether an automated client, a crawler, a monitor, a scanner or a webhook sender, uses
+    #: the address. On a paid plan or the trial.
+    is_bot: bool = field(default=False, metadata=_HELD)
     #: Whose bot it is, on a paid plan's answers (and the trial's): empty when `is_bot` is
     #: false, None where your plan does not include it.
     bot: BotDetail | None = None
@@ -1133,7 +1146,7 @@ R = TypeVar("R")
 def _record(cls: type[R], body: Any, name: str) -> R:
     """`body` as `cls`, each member read by the type its field names: one with no default
     must be present and is null only where that type allows None, and one defaulting to
-    None reads as None when absent or null. `raw` is the body itself."""
+    None reads as None when absent or null, a `_HELD` flag as False. `raw` is the body itself."""
     body = _of_type(body, name, dict)
     hints = _hints(cls)
     values: dict[str, Any] = {}
@@ -1144,7 +1157,9 @@ def _record(cls: type[R], body: Any, name: str) -> R:
         wire = f"{name}.{member.name}"
         required = _wire_required(member)
         if member.name not in body:
-            if required:
+            if member.metadata.get("held"):
+                values[member.name] = False
+            elif required:
                 raise KeyError(wire)
             continue
         value = body[member.name]

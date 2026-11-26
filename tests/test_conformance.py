@@ -15,6 +15,7 @@ import pytest
 from helpers import (
     API_KEY,
     CHECKSUM_PATH,
+    HELD_FLAGS,
     LIST_PATH,
     METADATA_PATH,
     TESTDATA,
@@ -222,7 +223,11 @@ def test_a_lookup_preserves_absent_versus_false_across_every_plan_shape(
     for key in expect["empty"]:
         assert as_wire(getattr(result, key)) in ({}, []), f"{key} must be present and empty"
     for key in expect["absent"]:
-        assert getattr(result, key) is None, f"{key} must be ABSENT, not false"
+        if key in HELD_FLAGS:
+            assert getattr(result, key) is False, f"{key} is held as a bool, so absent reads false"
+            assert key not in result.raw, f"{key} must not be on the wire answer"
+        else:
+            assert getattr(result, key) is None, f"{key} must be ABSENT, not false"
         if key.startswith("is_") and isinstance(result, Result):
             assert result.flagged(key) is False, f"{key} must coalesce to false"
     for name, members in expect.get("absentIn", {}).items():

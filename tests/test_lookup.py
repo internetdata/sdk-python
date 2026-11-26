@@ -11,6 +11,7 @@ import importlib
 import json
 import math
 import re
+import typing
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -22,6 +23,7 @@ import pytest
 from helpers import (
     API,
     API_KEY,
+    HELD_FLAGS,
     LIST_PATH,
     TESTDATA,
     ClientFactory,
@@ -580,12 +582,6 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
     "is_vpn a number": ("lookup", answer("8.8.8.8", is_vpn=1)),
     "cap_reached a string": ("lookup", answer("8.8.8.8", cap_reached="true")),
     "tor null": ("lookup", answer("8.8.8.8", tor=None)),
-    "is_bot absent": (
-        "lookup",
-        {key: value for key, value in answer("8.8.8.8").items() if key != "is_bot"},
-    ),
-    "is_bot null": ("lookup", answer("8.8.8.8", is_bot=None)),
-    "is_bot a string": ("lookup", answer("8.8.8.8", is_bot="false")),
     "bot a list": ("lookup", answer("8.8.8.8", is_bot=False, bot=[])),
     "a bot's agents a string": ("lookup", answer("8.8.8.8", is_bot=True, bot={"agents": "x"})),
     "the asn's country null": (
@@ -731,11 +727,20 @@ MALFORMED: dict[str, tuple[str, dict[str, Any]]] = {
 }
 
 
+# The eight flags Unlimited's answer leaves out, as a paid one's carries them: a present one of
+# the wrong type is still the server's failure, whatever it is, a null included.
+MALFORMED.update(
+    {
+        f"{flag} {kind}": ("lookup", answer("8.8.8.8", **{flag: value}))
+        for flag in HELD_FLAGS
+        for kind, value in (("null", None), ("a string", "false"), ("a number", 1))
+    }
+)
+
+
 # Members the spec requires that keep a default, so a type built by hand without them still
 # builds. A batch entry skips the generated decoder, so `to_result` alone must refuse them.
 REQUIRED_WITH_A_DEFAULT: dict[str, dict[str, Any]] = {
-    "is_bot absent": {key: value for key, value in answer("8.8.8.8").items() if key != "is_bot"},
-    "is_bot null": answer("8.8.8.8", is_bot=None),
     "the asn's country absent": answer(
         "8.8.8.8", asn={k: v for k, v in answer("x")["asn"].items() if k != "country"}
     ),
@@ -756,6 +761,52 @@ def test_an_answer_without_a_required_member_that_has_a_default_is_refused(
 ) -> None:
     with pytest.raises((KeyError, ValueError)):
         to_result(body)
+
+
+@pytest.mark.parametrize("flag", HELD_FLAGS)
+def test_an_answer_without_a_held_flag_reads_it_false_in_a_lookup_and_a_batch(
+    make_client: ClientFactory, flag: str
+) -> None:
+    body = answer("8.8.8.8")
+    assert flag not in body, "Unlimited's answer leaves the eight out"
+    stub = Lookups({"8.8.8.8": {"body": body}})
+    client = make_client(transport=stub.transport, cache=False)
+
+    found = [client.lookup("8.8.8.8"), client.lookup_batch(["8.8.8.8"])["8.8.8.8"]]
+
+    for result in found:
+        assert isinstance(result, Result)
+        assert getattr(result, flag) is False
+        assert flag not in result.raw
+        assert result.flagged(flag) is False  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("flag", HELD_FLAGS)
+@pytest.mark.parametrize("served", [True, False])
+def test_a_held_flag_an_answer_carries_reads_as_served(flag: str, served: bool) -> None:
+    result = to_result(answer("8.8.8.8", **{flag: served}))
+    assert getattr(result, flag) is served
+    assert result.raw[flag] is served
+
+
+@pytest.mark.parametrize("flag", HELD_FLAGS)
+@pytest.mark.parametrize("value", [None, "false", 0, 1, [], {}])
+def test_a_held_flag_that_is_no_bool_is_refused_in_a_batch_entry_too(flag: str, value: Any) -> None:
+    with pytest.raises(ValueError):
+        to_result(answer("8.8.8.8", **{flag: value}))
+
+
+def test_the_eight_flags_keep_the_type_and_the_constructor_they_had() -> None:
+    """A minor never moves a member of a public type: `bool`, with no default except
+    `is_bot`'s, so a `Result` built by hand still names the seven."""
+    hints = typing.get_type_hints(Result)
+    members = {f.name: f for f in dataclasses.fields(Result)}
+    for flag in HELD_FLAGS:
+        assert hints[flag] is bool, flag
+    assert members["is_bot"].default is False
+    for flag in HELD_FLAGS[1:]:
+        assert members[flag].default is dataclasses.MISSING, flag
+    assert all(not _wire_required(members[flag]) for flag in HELD_FLAGS)
 
 
 def test_a_result_and_an_asn_built_by_hand_need_none_of_the_members_added_since_2_17() -> None:

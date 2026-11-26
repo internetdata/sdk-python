@@ -42,17 +42,7 @@ class LookupResponse:
         is_bogon (bool): Reserved space, answered from the address alone.
         is_tor (bool): In Tor IP: a Tor exit.
         is_relay (bool): In Relay IP: an anonymizing relay such as iCloud Private Relay.
-        is_bot (bool): In Bot IP: an automated client's address, such as a search engine's or an AI company's crawler,
-            an uptime monitor, an internet scanner or a webhook sender. `bot` says whose, what it does and whether its
-            operator vouches for the address.
         is_anycast (bool): In Anycast IP: announced from many places at once.
-        is_carrier (bool): In Carrier IP: a mobile carrier's address space.
-        is_satellite (bool): In Satellite IP: a satellite operator's address space.
-        is_ssh (bool): In SSH IP: an SSH server answered here.
-        is_smtp (bool): In SMTP IP: a mail server answered here.
-        is_web (bool): In Web IP: a web server answered here on port 80 or 443.
-        is_dns_resolver (bool): In DNS Resolver IP: an open DNS resolver answered here.
-        is_bittorrent (bool): In BitTorrent IP: a BitTorrent client was seen here in the last 90 days.
         tor (ClassDetail):
         relay (ClassDetail):
         location (Location): Where the address is.
@@ -69,6 +59,18 @@ class LookupResponse:
             paid plan or the trial.
         is_hosting (bool | Unset): In Hosting IP: a hosting or cloud network. On a paid plan or the trial.
         is_cdn (bool | Unset): In CDN IP: a content delivery network. On a paid plan or the trial.
+        is_bot (bool | Unset): In Bot IP: an automated client's address, such as a search engine's or an AI company's
+            crawler, an uptime monitor, an internet scanner or a webhook sender. `bot` says whose, what it does and whether
+            its operator vouches for the address. On a paid plan or the trial.
+        is_carrier (bool | Unset): In Carrier IP: a mobile carrier's address space. On a paid plan or the trial.
+        is_satellite (bool | Unset): In Satellite IP: a satellite operator's address space. On a paid plan or the trial.
+        is_ssh (bool | Unset): In SSH IP: an SSH server answered here. On a paid plan or the trial.
+        is_smtp (bool | Unset): In SMTP IP: a mail server answered here. On a paid plan or the trial.
+        is_web (bool | Unset): In Web IP: a web server answered here on port 80 or 443. On a paid plan or the trial.
+        is_dns_resolver (bool | Unset): In DNS Resolver IP: an open DNS resolver answered here. On a paid plan or the
+            trial.
+        is_bittorrent (bool | Unset): In BitTorrent IP: a BitTorrent client was seen here in the last 90 days. On a paid
+            plan or the trial.
         vpn (ClassDetail | Unset):
         resproxy (ProxyDetail | Unset):
         dcproxy (ProxyDetail | Unset):
@@ -101,15 +103,7 @@ class LookupResponse:
     is_bogon: bool
     is_tor: bool
     is_relay: bool
-    is_bot: bool
     is_anycast: bool
-    is_carrier: bool
-    is_satellite: bool
-    is_ssh: bool
-    is_smtp: bool
-    is_web: bool
-    is_dns_resolver: bool
-    is_bittorrent: bool
     tor: ClassDetail
     relay: ClassDetail
     location: Location
@@ -124,6 +118,14 @@ class LookupResponse:
     is_pubproxy: bool | Unset = UNSET
     is_hosting: bool | Unset = UNSET
     is_cdn: bool | Unset = UNSET
+    is_bot: bool | Unset = UNSET
+    is_carrier: bool | Unset = UNSET
+    is_satellite: bool | Unset = UNSET
+    is_ssh: bool | Unset = UNSET
+    is_smtp: bool | Unset = UNSET
+    is_web: bool | Unset = UNSET
+    is_dns_resolver: bool | Unset = UNSET
+    is_bittorrent: bool | Unset = UNSET
     vpn: ClassDetail | Unset = UNSET
     resproxy: ProxyDetail | Unset = UNSET
     dcproxy: ProxyDetail | Unset = UNSET
@@ -156,23 +158,7 @@ class LookupResponse:
 
         is_relay = self.is_relay
 
-        is_bot = self.is_bot
-
         is_anycast = self.is_anycast
-
-        is_carrier = self.is_carrier
-
-        is_satellite = self.is_satellite
-
-        is_ssh = self.is_ssh
-
-        is_smtp = self.is_smtp
-
-        is_web = self.is_web
-
-        is_dns_resolver = self.is_dns_resolver
-
-        is_bittorrent = self.is_bittorrent
 
         tor = self.tor.to_dict()
 
@@ -201,6 +187,22 @@ class LookupResponse:
         is_hosting = self.is_hosting
 
         is_cdn = self.is_cdn
+
+        is_bot = self.is_bot
+
+        is_carrier = self.is_carrier
+
+        is_satellite = self.is_satellite
+
+        is_ssh = self.is_ssh
+
+        is_smtp = self.is_smtp
+
+        is_web = self.is_web
+
+        is_dns_resolver = self.is_dns_resolver
+
+        is_bittorrent = self.is_bittorrent
 
         vpn: dict[str, Any] | Unset = UNSET
         if not isinstance(self.vpn, Unset):
@@ -293,15 +295,7 @@ class LookupResponse:
                 "is_bogon": is_bogon,
                 "is_tor": is_tor,
                 "is_relay": is_relay,
-                "is_bot": is_bot,
                 "is_anycast": is_anycast,
-                "is_carrier": is_carrier,
-                "is_satellite": is_satellite,
-                "is_ssh": is_ssh,
-                "is_smtp": is_smtp,
-                "is_web": is_web,
-                "is_dns_resolver": is_dns_resolver,
-                "is_bittorrent": is_bittorrent,
                 "tor": tor,
                 "relay": relay,
                 "location": location,
@@ -325,6 +319,22 @@ class LookupResponse:
             field_dict["is_hosting"] = is_hosting
         if is_cdn is not UNSET:
             field_dict["is_cdn"] = is_cdn
+        if is_bot is not UNSET:
+            field_dict["is_bot"] = is_bot
+        if is_carrier is not UNSET:
+            field_dict["is_carrier"] = is_carrier
+        if is_satellite is not UNSET:
+            field_dict["is_satellite"] = is_satellite
+        if is_ssh is not UNSET:
+            field_dict["is_ssh"] = is_ssh
+        if is_smtp is not UNSET:
+            field_dict["is_smtp"] = is_smtp
+        if is_web is not UNSET:
+            field_dict["is_web"] = is_web
+        if is_dns_resolver is not UNSET:
+            field_dict["is_dns_resolver"] = is_dns_resolver
+        if is_bittorrent is not UNSET:
+            field_dict["is_bittorrent"] = is_bittorrent
         if vpn is not UNSET:
             field_dict["vpn"] = vpn
         if resproxy is not UNSET:
@@ -401,23 +411,7 @@ class LookupResponse:
 
         is_relay = d.pop("is_relay")
 
-        is_bot = d.pop("is_bot")
-
         is_anycast = d.pop("is_anycast")
-
-        is_carrier = d.pop("is_carrier")
-
-        is_satellite = d.pop("is_satellite")
-
-        is_ssh = d.pop("is_ssh")
-
-        is_smtp = d.pop("is_smtp")
-
-        is_web = d.pop("is_web")
-
-        is_dns_resolver = d.pop("is_dns_resolver")
-
-        is_bittorrent = d.pop("is_bittorrent")
 
         tor = ClassDetail.from_dict(d.pop("tor"))
 
@@ -446,6 +440,22 @@ class LookupResponse:
         is_hosting = d.pop("is_hosting", UNSET)
 
         is_cdn = d.pop("is_cdn", UNSET)
+
+        is_bot = d.pop("is_bot", UNSET)
+
+        is_carrier = d.pop("is_carrier", UNSET)
+
+        is_satellite = d.pop("is_satellite", UNSET)
+
+        is_ssh = d.pop("is_ssh", UNSET)
+
+        is_smtp = d.pop("is_smtp", UNSET)
+
+        is_web = d.pop("is_web", UNSET)
+
+        is_dns_resolver = d.pop("is_dns_resolver", UNSET)
+
+        is_bittorrent = d.pop("is_bittorrent", UNSET)
 
         _vpn = d.pop("vpn", UNSET)
         vpn: ClassDetail | Unset
@@ -591,15 +601,7 @@ class LookupResponse:
             is_bogon=is_bogon,
             is_tor=is_tor,
             is_relay=is_relay,
-            is_bot=is_bot,
             is_anycast=is_anycast,
-            is_carrier=is_carrier,
-            is_satellite=is_satellite,
-            is_ssh=is_ssh,
-            is_smtp=is_smtp,
-            is_web=is_web,
-            is_dns_resolver=is_dns_resolver,
-            is_bittorrent=is_bittorrent,
             tor=tor,
             relay=relay,
             location=location,
@@ -614,6 +616,14 @@ class LookupResponse:
             is_pubproxy=is_pubproxy,
             is_hosting=is_hosting,
             is_cdn=is_cdn,
+            is_bot=is_bot,
+            is_carrier=is_carrier,
+            is_satellite=is_satellite,
+            is_ssh=is_ssh,
+            is_smtp=is_smtp,
+            is_web=is_web,
+            is_dns_resolver=is_dns_resolver,
+            is_bittorrent=is_bittorrent,
             vpn=vpn,
             resproxy=resproxy,
             dcproxy=dcproxy,

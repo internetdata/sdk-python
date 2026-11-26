@@ -9,6 +9,7 @@ own names, so a condition needs no translation here at all, a path such as
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import http.server
 import json
 import threading
@@ -16,7 +17,7 @@ import time
 from typing import Any, Self
 
 import pytest
-from helpers import TESTDATA, Lookups, SlowBody
+from helpers import HELD_FLAGS, TESTDATA, Lookups, SlowBody
 
 from internetdata import AsyncInternetData, InternetData, InternetDataError
 from internetdata.middleware import (
@@ -124,9 +125,8 @@ def test_a_network_type_condition_blocks_on_every_plan() -> None:
 
 
 def test_a_bot_condition_blocks_a_bot_and_passes_an_address_that_is_none() -> None:
-    """`is_bot` is on every plan's answer and `bot` on a paid one's, so either can be a
-    condition: a verified crawler blocks, an Unlimited answer for an address no bot uses
-    passes."""
+    """`is_bot` and `bot` are a paid answer's, so either can be a condition: a verified
+    crawler blocks, an Unlimited answer, which carries neither, passes."""
     bot = ANSWERS["paid-bot"]
     blocking = _core(client=_serving(bot), block_condition={"is_bot": True})
     lookup = blocking.evaluate(Req(ip=bot["ip"]))
@@ -203,6 +203,47 @@ def test_a_missing_member_warns_once_or_raises_on_request() -> None:
         on_warn=fail,
     )
     assert quiet.evaluate(Req()) is not None
+
+
+@pytest.mark.parametrize("flag", HELD_FLAGS)
+def test_a_flag_held_false_that_the_served_answer_lacks_is_a_plan_gap(flag: str) -> None:
+    """The type reads the flag False either way, so the report reads what the answer carried."""
+    warnings: list[str] = []
+    core = _core(client=_serving(UNLIMITED), block_condition={flag: True}, on_warn=warnings.append)
+    lookup = core.evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
+    assert lookup.result is not None and getattr(lookup.result, flag) is False
+    assert len(warnings) == 1
+    assert warnings[0].startswith(f"block_condition names {flag},")
+
+    paid = _core(client=_serving(PAID), block_condition={flag: True}, on_warn=warnings.append)
+    answered = paid.evaluate(Req())
+    assert answered is not None and answered.error is None
+    assert len(warnings) == 1, "a paid answer carries the flag, so nothing is missing"
+
+
+def test_a_bogon_and_a_result_built_by_hand_carry_every_held_flag() -> None:
+    condition = {flag: True for flag in HELD_FLAGS}
+    assert missing_members(condition, InternetData().lookup("10.0.0.1")) == []
+    assert missing_members(condition, dataclasses.replace(to_result(PAID), raw={})) == []
+    assert missing_members(condition, to_result(UNLIMITED)) == list(HELD_FLAGS)
+
+
+@pytest.mark.parametrize("flag", HELD_FLAGS)
+def test_a_flag_the_served_answer_lacks_is_a_plan_gap_in_the_async_core_too(flag: str) -> None:
+    async def evaluate() -> tuple[Lookup | None, list[str]]:
+        warnings: list[str] = []
+        stub = Lookups({PUBLIC_IP: {"body": UNLIMITED}})
+        async with AsyncInternetData(cache=False, retries=0, transport=stub.transport) as client:
+            core: AsyncCore[Req] = AsyncCore(
+                Options(client=client, block_condition={flag: True}, on_warn=warnings.append),
+                SELECTORS.default,
+            )
+            return await core.evaluate(Req()), warnings
+
+    lookup, warnings = asyncio.run(evaluate())
+    assert lookup is not None and lookup.blocked is False
+    assert [message.split(",")[0] for message in warnings] == [f"block_condition names {flag}"]
 
 
 def test_a_paid_member_inside_a_shared_object_is_reported_by_its_path() -> None:

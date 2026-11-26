@@ -31,6 +31,19 @@ TESTDATA: dict[str, Any] = json.loads(
 API = "https://api.example"
 API_KEY = "secret-key"
 
+# Held at their non-optional public type until the next major, so an answer that leaves one out
+# (Unlimited's) reads False and never None. The one list every check on them reads.
+HELD_FLAGS = (
+    "is_bot",
+    "is_carrier",
+    "is_satellite",
+    "is_ssh",
+    "is_smtp",
+    "is_web",
+    "is_dns_resolver",
+    "is_bittorrent",
+)
+
 LIST_PATH = "/api/v2/database/list"
 DOWNLOAD_PATH = "/api/v2/database/download"
 METADATA_PATH = "/api/v2/database/metadata"
@@ -459,12 +472,16 @@ def answer(ip: str, /, **members: Any) -> dict[str, Any]:
 
 def as_wire(value: Any) -> Any:
     """A lookup answer, or any part of it, back in the shape the API serves it: every member
-    this library read as None left out, and a tuple as a list. `raw` is not part of it."""
+    this library read as None left out, so is a held flag its `raw` lacks, and a tuple as a
+    list. `raw` is not part of it."""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        served = getattr(value, "raw", None)
         return {
             member.name: as_wire(getattr(value, member.name))
             for member in dataclasses.fields(value)
-            if member.name != "raw" and getattr(value, member.name) is not None
+            if member.name != "raw"
+            and getattr(value, member.name) is not None
+            and not (served and member.name in HELD_FLAGS and member.name not in served)
         }
     if isinstance(value, tuple):
         return [as_wire(item) for item in value]

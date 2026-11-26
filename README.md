@@ -17,7 +17,7 @@ Requires Python 3.11 or newer. Type hints are included, and the package ships `p
 
 ## Usage
 
-**No API key needed to start.** Unlimited, the free plan, answers `location`, `asn`, `company`, `abuse` and every flag but the VPN, proxy, hosting and CDN ones, `is_bot` included, with no daily or monthly cap, with a key or without one.
+**No API key needed to start.** Unlimited, the free plan, answers `location`, `asn`, `company`, `abuse`, the hostname and the bogon, Tor, relay and anycast flags, with no daily or monthly cap, with a key or without one.
 
 ```python
 from internetdata import InternetData
@@ -372,11 +372,13 @@ Each redirect URI must be https on a public host name, or http on a loopback add
 
 ### Fields your plan does not include
 
-Unlimited leaves out the VPN, proxy, hosting and CDN flags, the detail behind every flag but Tor's and relay's (`bot`, whose bot uses the address, included), the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its trial is spent. A paid key's carries `cap_reached`, true once its organization's overage cap is reached, when the answer has Unlimited's fields and isn't billed. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too.
+Unlimited leaves out the VPN, proxy, hosting, CDN, bot, carrier, satellite, SSH, SMTP, web, DNS resolver and BitTorrent flags, the detail behind every flag but Tor's and relay's (`bot`, whose bot uses the address, included), the city and region, the Whois records and the hosted domains; a free-plan key's answer carries `trial_expired`, true once its trial is spent. A paid key's carries `cap_reached`, true once its organization's overage cap is reached, when the answer has Unlimited's fields and isn't billed. Those are `None` when your key does not include them, which means "not in your plan" rather than "checked, and no", inside `location`, `asn`, `company` and `abuse` too. The exception, until the next major, is `is_bot`, `is_carrier`, `is_satellite`, `is_ssh`, `is_smtp`, `is_web`, `is_dns_resolver` and `is_bittorrent`: they stay plain `bool`s and read `False` when the answer leaves them out, so `result.raw` is how you tell a flag the answer carried from one it did not.
 
 ```python
 result.flagged("is_hosting")   # False rather than None on a plan without it
 result.is_hosting is None      # True on Unlimited: not in your plan
+result.is_bot                  # False on Unlimited, which leaves it out
+"is_bot" in result.raw         # False on Unlimited: it was not in the answer
 result.location.city is None   # True on Unlimited
 result.trial_expired is True   # a free-plan key's trial is spent
 result.cap_reached is True     # a paid key is past its overage cap
