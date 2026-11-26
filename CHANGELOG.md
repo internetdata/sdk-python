@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.21.0 - 2026-11-26
+
+### Fixes
+
+- Read a keyless answer without the bot, carrier, satellite and service flags ([`9797b59`](https://github.com/internetdata/sdk-python/commit/9797b5961bb5a5d8a49bcef98e9f6fae85aa5607))
+
 ## 2.20.0 - 2026-11-25
 
 ### Features
