@@ -6,6 +6,8 @@ from typing import Any, Self, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="Asn")
 
 
@@ -17,19 +19,19 @@ class Asn:
         asn (int): The AS announcing the address, 0 where none does.
         name (str): Its operator.
         domain (str): Its operator's domain.
-        type_ (str): The kind of network it runs.
         prefix (str): The announced prefix covering the address.
         country (str): The country its registry assigned it to.
         rpki_status (str): The announcement's RPKI status.
+        type_ (str | Unset): The kind of network it runs. On a paid plan or the trial.
     """
 
     asn: int
     name: str
     domain: str
-    type_: str
     prefix: str
     country: str
     rpki_status: str
+    type_: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,13 +41,13 @@ class Asn:
 
         domain = self.domain
 
-        type_ = self.type_
-
         prefix = self.prefix
 
         country = self.country
 
         rpki_status = self.rpki_status
+
+        type_ = self.type_
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -54,12 +56,13 @@ class Asn:
                 "asn": asn,
                 "name": name,
                 "domain": domain,
-                "type": type_,
                 "prefix": prefix,
                 "country": country,
                 "rpki_status": rpki_status,
             }
         )
+        if type_ is not UNSET:
+            field_dict["type"] = type_
 
         return field_dict
 
@@ -72,22 +75,22 @@ class Asn:
 
         domain = d.pop("domain")
 
-        type_ = d.pop("type")
-
         prefix = d.pop("prefix")
 
         country = d.pop("country")
 
         rpki_status = d.pop("rpki_status")
 
+        type_ = d.pop("type", UNSET)
+
         asn = cls(
             asn=asn,
             name=name,
             domain=domain,
-            type_=type_,
             prefix=prefix,
             country=country,
             rpki_status=rpki_status,
+            type_=type_,
         )
 
         asn.additional_properties = d

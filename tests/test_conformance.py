@@ -219,7 +219,9 @@ def test_a_lookup_preserves_absent_versus_false_across_every_plan_shape(
         if isinstance(value, bool):
             assert getattr(result, key) is value, f"{key} must be a bool"
     for key in expect["objects"]:
-        assert as_wire(getattr(result, key)) == body[key], f"{key} must read as served"
+        assert as_wire(getattr(result, key), result.raw[key]) == body[key], (
+            f"{key} must read as served"
+        )
     for key in expect["empty"]:
         assert as_wire(getattr(result, key)) in ({}, []), f"{key} must be present and empty"
     for key in expect["absent"]:
@@ -232,7 +234,12 @@ def test_a_lookup_preserves_absent_versus_false_across_every_plan_shape(
             assert result.flagged(key) is False, f"{key} must coalesce to false"
     for name, members in expect.get("absentIn", {}).items():
         for member in members:
-            assert getattr(getattr(result, name), member) is None, f"{name}.{member} must be ABSENT"
+            got = getattr(getattr(result, name), member)
+            if (name, member) == ("asn", "type"):
+                assert got == "", "asn.type is held as a str, so absent reads empty"
+                assert member not in result.raw[name], f"{name}.{member} must not be on the wire"
+            else:
+                assert got is None, f"{name}.{member} must be ABSENT"
     assert as_wire(result) == body, "every member must read back as served"
 
 

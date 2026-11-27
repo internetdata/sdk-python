@@ -183,7 +183,8 @@ def keyed_client() -> tuple[InternetData, Recorder]:
     return InternetData(credential.key(), base_url=STAGING_API, transport=recorder), recorder
 
 
-# Held at their non-optional public type until the next major, so one left out reads False.
+# Held at their non-optional public type until the next major, so one left out reads False; so
+# does the AS's `type`, a `str`, read empty.
 HELD_FLAGS = (
     "is_bot",
     "is_carrier",
@@ -198,7 +199,7 @@ HELD_FLAGS = (
 
 def assert_read_as_served(value: Any, served: Any, where: str) -> None:
     """Every member `served` carries reached `value` as served, and every member it did not
-    carry reads as None, a held flag as False. A member the API serves and this release does
+    carry reads as None, a held flag as False and the AS's `type` as "". A member the API serves and this release does
     not model is the API moving ahead of it, and is left alone."""
     for member in dataclasses.fields(value):
         if member.name == "raw":
@@ -208,6 +209,8 @@ def assert_read_as_served(value: Any, served: Any, where: str) -> None:
         if member.name not in served:
             if where == "answer" and member.name in HELD_FLAGS:
                 assert held is False, f"{name} is not served, so it must read as False"
+            elif name == "answer.asn.type":
+                assert held == "", f"{name} is not served, so it must read as empty"
             else:
                 assert held is None, f"{name} is not served, so it must read as None, not {held!r}"
             continue

@@ -738,6 +738,19 @@ MALFORMED.update(
 )
 
 
+# The AS's `type` is the ninth held member, a `str` that Unlimited's answer leaves out: one
+# present of another type is the server's failure too, a null included.
+MALFORMED.update(
+    {
+        f"the asn's type {kind}": (
+            "lookup",
+            answer("8.8.8.8", asn={**answer("x")["asn"], "type": value}),
+        )
+        for kind, value in (("null", None), ("a number", 1), ("a bool", False), ("a list", []))
+    }
+)
+
+
 # Members the spec requires that keep a default, so a type built by hand without them still
 # builds. A batch entry skips the generated decoder, so `to_result` alone must refuse them.
 REQUIRED_WITH_A_DEFAULT: dict[str, dict[str, Any]] = {
@@ -794,6 +807,50 @@ def test_a_held_flag_an_answer_carries_reads_as_served(flag: str, served: bool) 
 def test_a_held_flag_that_is_no_bool_is_refused_in_a_batch_entry_too(flag: str, value: Any) -> None:
     with pytest.raises(ValueError):
         to_result(answer("8.8.8.8", **{flag: value}))
+
+
+def test_an_answer_without_the_asns_type_reads_it_empty_in_a_lookup_and_a_batch(
+    make_client: ClientFactory,
+) -> None:
+    body = answer("8.8.8.8")
+    assert "type" not in body["asn"], "Unlimited's asn carries no type"
+    stub = Lookups({"8.8.8.8": {"body": body}})
+    client = make_client(transport=stub.transport, cache=False)
+
+    found = [client.lookup("8.8.8.8"), client.lookup_batch(["8.8.8.8"])["8.8.8.8"]]
+
+    for result in found:
+        assert isinstance(result, Result)
+        assert result.asn is not None
+        assert result.asn.type == ""
+        assert "type" not in result.raw["asn"]
+        assert result.asn.name == body["asn"]["name"], "the rest of the asn reads as served"
+
+
+@pytest.mark.parametrize("served", ["hosting", "isp", "business", ""])
+def test_an_asn_type_an_answer_carries_reads_as_served(served: str) -> None:
+    result = to_result(answer("8.8.8.8", asn={**answer("x")["asn"], "type": served}))
+    assert result.asn is not None
+    assert result.asn.type == served
+    assert result.raw["asn"]["type"] == served
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, False, [], {}])
+def test_an_asn_type_that_is_no_string_is_refused_in_a_batch_entry_too(value: Any) -> None:
+    with pytest.raises(ValueError):
+        to_result(answer("8.8.8.8", asn={**answer("x")["asn"], "type": value}))
+
+
+def test_the_asns_type_keeps_the_type_and_the_constructor_it_had() -> None:
+    """A minor never moves a member of a public type: `str`, with no default, so an `Asn`
+    built by hand still names it."""
+    member = {f.name: f for f in dataclasses.fields(Asn)}["type"]
+    assert typing.get_type_hints(Asn)["type"] is str
+    assert member.default is dataclasses.MISSING
+    assert not _wire_required(member)
+    assert Asn(asn=0, name="", domain="", type="hosting", prefix="").type == "hosting"
+    with pytest.raises(TypeError):
+        Asn(asn=0, name="", domain="", prefix="")  # type: ignore[call-arg]
 
 
 def test_the_eight_flags_keep_the_type_and_the_constructor_they_had() -> None:

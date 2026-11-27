@@ -420,8 +420,9 @@ def _date_time(value: Any, name: str) -> datetime.datetime:
 #: without it keeps working: `_record` refuses an answer where it is absent or null.
 _REQUIRED: dict[str, bool] = {"required": True}
 
-#: Marks a flag Unlimited's answer no longer carries that keeps its non-optional `bool` until
-#: the next major: `_record` reads it absent as False, and still refuses a null or a non-bool.
+#: Marks a member Unlimited's answer no longer carries that keeps its non-optional type until
+#: the next major: `_record` reads it absent as that type's empty value (False for a flag, ""
+#: for the AS's `type`), and still refuses a null or a value of another type.
 _HELD: dict[str, bool] = {"held": True}
 
 #: Marks a day the spec gives `format: date` that the type hands back as the served string:
@@ -432,7 +433,7 @@ _DAY: dict[str, bool] = {"day": True}
 
 def _wire_required(member: dataclasses.Field[Any]) -> bool:
     """Whether an answer must carry `member`: it has no default, or it is marked `_REQUIRED`,
-    and it is not one of the `_HELD` flags, which an answer may leave out."""
+    and it is not a `_HELD` member, which an answer may leave out."""
     if member.metadata.get("held"):
         return False
     return member.default is dataclasses.MISSING or bool(member.metadata.get("required"))
@@ -669,12 +670,13 @@ class Location:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Asn:
     """The network announcing the address, from IP ASN, on every answer: `asn` is 0 where
-    none does."""
+    none does. `type` is a paid plan's and the trial's: an answer without it, as Unlimited's
+    is, reads "" here, and the result's `raw["asn"]` says whether the answer carried it."""
 
     asn: int
     name: str
     domain: str
-    type: str
+    type: str = field(metadata=_HELD)
     prefix: str
     #: On every answer. Typed optional so an `Asn` built by hand without it still builds;
     #: an answer without it is refused, as the spec requires it.
@@ -757,7 +759,8 @@ class Result:
     Eight flags are the exception until the next major: `is_bot`, `is_carrier`,
     `is_satellite`, `is_ssh`, `is_smtp`, `is_web`, `is_dns_resolver` and `is_bittorrent`
     stay plain `bool`s, and read False on an answer that leaves them out, as Unlimited's
-    does. `raw` holds the members the answer carried.
+    does, and so does `asn.type`, a `str` that reads "". `raw` holds the members the answer
+    carried.
 
     A detail object that is present but empty (every field `None`, Web IP's an empty
     tuple) means the flag above it is false.
@@ -1146,7 +1149,8 @@ R = TypeVar("R")
 def _record(cls: type[R], body: Any, name: str) -> R:
     """`body` as `cls`, each member read by the type its field names: one with no default
     must be present and is null only where that type allows None, and one defaulting to
-    None reads as None when absent or null, a `_HELD` flag as False. `raw` is the body itself."""
+    None reads as None when absent or null, a `_HELD` member as its type's empty value.
+    `raw` is the body itself."""
     body = _of_type(body, name, dict)
     hints = _hints(cls)
     values: dict[str, Any] = {}
@@ -1158,7 +1162,8 @@ def _record(cls: type[R], body: Any, name: str) -> R:
         required = _wire_required(member)
         if member.name not in body:
             if member.metadata.get("held"):
-                values[member.name] = False
+                (kind,) = _arms(hints[member.name])
+                values[member.name] = kind()
             elif required:
                 raise KeyError(wire)
             continue

@@ -21,7 +21,7 @@ from typing import Any, NoReturn, Self
 import httpx
 import pytest
 
-from internetdata import AsyncInternetData, InternetData, Result
+from internetdata import Asn, AsyncInternetData, InternetData, Result
 from internetdata._core import AsyncClock, Clock
 
 TESTDATA: dict[str, Any] = json.loads(
@@ -470,18 +470,25 @@ def answer(ip: str, /, **members: Any) -> dict[str, Any]:
     return {**unlimited, "ip": ip, **members}
 
 
-def as_wire(value: Any) -> Any:
+def as_wire(value: Any, served: Any = None) -> Any:
     """A lookup answer, or any part of it, back in the shape the API serves it: every member
-    this library read as None left out, so is a held flag its `raw` lacks, and a tuple as a
-    list. `raw` is not part of it."""
+    this library read as None left out, so is a held member the served answer lacks (the
+    flags, the AS's `type`), and a tuple as a list. `raw` is not part of it. `served` is the
+    wire object the part was read from, which only the answer itself carries in `raw`."""
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        served = getattr(value, "raw", None)
+        served = getattr(value, "raw", None) or served
+        held = (
+            HELD_FLAGS if isinstance(value, Result) else ("type",) if isinstance(value, Asn) else ()
+        )
         return {
-            member.name: as_wire(getattr(value, member.name))
+            member.name: as_wire(
+                getattr(value, member.name),
+                served.get(member.name) if isinstance(served, dict) else None,
+            )
             for member in dataclasses.fields(value)
             if member.name != "raw"
             and getattr(value, member.name) is not None
-            and not (served and member.name in HELD_FLAGS and member.name not in served)
+            and not (served and member.name in held and member.name not in served)
         }
     if isinstance(value, tuple):
         return [as_wire(item) for item in value]

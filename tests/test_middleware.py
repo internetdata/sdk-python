@@ -114,10 +114,15 @@ def test_a_country_condition_blocks_without_a_key_and_another_country_passes() -
     assert lookup is not None and lookup.blocked is False
 
 
-def test_a_network_type_condition_blocks_on_every_plan() -> None:
-    hosting = _core(client=_serving(UNLIMITED), block_condition={"asn": {"type": "hosting"}})
-    lookup = hosting.evaluate(Req())
+def test_a_network_type_condition_blocks_on_a_paid_answer_alone() -> None:
+    """The AS's `type` is a paid answer's: Unlimited's carries none, so the same condition
+    never matches there, and the warning (below) names it."""
+    condition = {"asn": {"type": "hosting"}}
+    lookup = _core(client=_serving(PAID), block_condition=condition).evaluate(Req())
     assert lookup is not None and lookup.blocked is True
+
+    lookup = _core(client=_serving(UNLIMITED), block_condition=condition).evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
 
     servers = _core(client=_serving(PAID), block_condition=[{"is_hosting": True}, {"is_cdn": True}])
     lookup = servers.evaluate(Req())
@@ -227,6 +232,58 @@ def test_a_bogon_and_a_result_built_by_hand_carry_every_held_flag() -> None:
     assert missing_members(condition, InternetData().lookup("10.0.0.1")) == []
     assert missing_members(condition, dataclasses.replace(to_result(PAID), raw={})) == []
     assert missing_members(condition, to_result(UNLIMITED)) == list(HELD_FLAGS)
+
+
+def test_an_asn_type_the_served_answer_lacks_is_a_plan_gap_by_its_path() -> None:
+    """The type reads "" either way, so the report reads the wire object inside `raw`."""
+    warnings: list[str] = []
+    condition = {"asn": {"type": "hosting"}}
+    core = _core(client=_serving(UNLIMITED), block_condition=condition, on_warn=warnings.append)
+    lookup = core.evaluate(Req())
+    assert lookup is not None and lookup.blocked is False
+    assert lookup.result is not None and lookup.result.asn is not None
+    assert lookup.result.asn.type == ""
+    assert len(warnings) == 1
+    assert warnings[0].startswith("block_condition names asn.type,")
+
+    paid = _core(client=_serving(PAID), block_condition=condition, on_warn=warnings.append)
+    answered = paid.evaluate(Req())
+    assert answered is not None and answered.error is None
+    assert len(warnings) == 1, "a paid answer carries the type, so nothing is missing"
+
+
+def test_an_asn_type_is_carried_by_a_bogon_and_a_result_built_by_hand() -> None:
+    condition = {"asn": {"type": "hosting"}}
+    assert missing_members(condition, InternetData().lookup("10.0.0.1")) == []
+    assert missing_members(condition, dataclasses.replace(to_result(PAID), raw={})) == []
+    assert missing_members(condition, to_result(PAID)) == []
+    assert missing_members(condition, to_result(UNLIMITED)) == ["asn.type"]
+
+
+def test_an_asn_type_the_answer_lacks_is_a_plan_gap_in_the_async_core_and_a_guard() -> None:
+    async def evaluate() -> tuple[Lookup | None, list[str]]:
+        warnings: list[str] = []
+        stub = Lookups({PUBLIC_IP: {"body": UNLIMITED}})
+        async with AsyncInternetData(cache=False, retries=0, transport=stub.transport) as client:
+            core: AsyncCore[Req] = AsyncCore(
+                Options(
+                    client=client,
+                    block_condition={"asn": {"type": "hosting"}},
+                    on_warn=warnings.append,
+                ),
+                SELECTORS.default,
+            )
+            return await core.evaluate(Req()), warnings
+
+    lookup, warnings = asyncio.run(evaluate())
+    assert lookup is not None and lookup.blocked is False
+    assert [message.split(",")[0] for message in warnings] == ["block_condition names asn.type"]
+
+    guarded: list[str] = []
+    guard = Guard({"asn": {"type": "hosting"}}, on_warn=guarded.append)
+    assert lookup.result is not None
+    assert guard.blocks(Lookup(blocked=False, ip=PUBLIC_IP, result=lookup.result)) is False
+    assert [message.split(",")[0] for message in guarded] == ["block condition names asn.type"]
 
 
 @pytest.mark.parametrize("flag", HELD_FLAGS)
