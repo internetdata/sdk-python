@@ -2,6 +2,12 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.22.0 - 2026-11-27
+
+### Fixes
+
+- Read a keyless answer without the AS's type ([`a0e16fe`](https://github.com/internetdata/sdk-python/commit/a0e16fe4af916499005844e3592b17c011c2cb09))
+
 ## 2.21.0 - 2026-11-26
 
 ### Fixes
