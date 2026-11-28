@@ -2,6 +2,18 @@
 
 What each release changed for you, newest first. Each line is a commit's summary, linked to its full description and diff. Releases before 2.4.1 are described by their release commits.
 
+## 2.23.0 - 2026-11-28
+
+### Features
+
+- Middleware: allow_bots sends only a crawler's User-Agent, at most four an address ([`295cfc9`](https://github.com/internetdata/sdk-python/commit/295cfc9bd3b4dabfd527ead3efba448391abbefa))
+
+### Fixes
+
+- Middleware: a condition on the verdict is no plan gap for a request that sent no agent ([`d694309`](https://github.com/internetdata/sdk-python/commit/d694309f74da33d3bd2d17bd08be8c1f2f01739d))
+- Middleware: a bogon's answer reports no missing member ([`256a82a`](https://github.com/internetdata/sdk-python/commit/256a82a095cff34f4ca1ae970de1988a3322c3e9))
+- Spec 2026.11.27: the free plan's trial is a window from the first keyed lookup ([`1180823`](https://github.com/internetdata/sdk-python/commit/118082338817ca824ed72726e8578fea2fffe585))
+
 ## 2.22.0 - 2026-11-27
 
 ### Fixes
