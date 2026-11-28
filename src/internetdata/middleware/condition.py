@@ -59,10 +59,13 @@ def missing_members(condition: Conditions, result: Any) -> list[str]:
     populated object carries every member the plan includes, so a member missing there
     is one.
 
-    A locally answered bogon needs no special case: it is synthesized in the widest
-    shape, so every member is present and nothing reads as missing. A member the type holds
-    as False or "" (a flag, ``asn.type``) is missing when the served answer lacked it.
+    A bogon's answer reports nothing missing: it is synthesized in the widest shape, so
+    every member is present but a user agent's verdict, which this client leaves out for a
+    bogon and which no plan gap explains. A member the type holds as False or "" (a flag,
+    ``asn.type``) is missing when the served answer lacked it.
     """
+    if getattr(result, "is_bogon", False) is True:
+        return []
     missing: list[str] = []
     for one in _as_list(condition):
         _collect_missing(one, result, "", missing, None)

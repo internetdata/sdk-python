@@ -28,6 +28,7 @@ from internetdata.middleware import (
     Guard,
     Lookup,
     Options,
+    missing_members,
     names_crawler,
 )
 from internetdata.middleware.core import _CrawlerAgents
@@ -754,6 +755,35 @@ def test_a_guard_on_the_verdict_is_no_plan_gap_for_a_request_that_sent_no_agent(
     assert len(warned) == 1, "allow_bots off, a guard on the verdict is still reported"
     with pytest.raises(ValueError, match="user_agent"):
         Guard(FORGED, on_missing_field="raise").blocks(off)
+
+
+@pytest.mark.parametrize("flavor", ["sync", "async"])
+@pytest.mark.parametrize("action", ["raise", "warn"])
+@pytest.mark.parametrize("peer", ["127.0.0.1", "10.0.0.1", "::1"])
+def test_a_bogon_peer_with_a_crawler_agent_is_no_plan_gap(
+    flavor: str, action: str, peer: str
+) -> None:
+    # A bogon is answered locally and carries no verdict, so a condition naming one read as a
+    # member the plan lacks, and "raise" failed a crawler's request in local development.
+    warnings: list[str] = []
+    origin = Origin(verdict="spoofed")
+    found = _judge(
+        flavor,
+        origin,
+        [Req(user_agent=GOOGLEBOT, ip=peer)],
+        allow_bots=True,
+        block_condition=FORGED,
+        on_missing_field=action,
+        on_warn=warnings.append,
+    )
+
+    assert found[0].blocked is False
+    assert found[0].result is not None
+    assert found[0].result.is_bogon is True
+    assert origin.agents == [], "a bogon never reached the origin"
+    assert [w for w in warnings if "does not include" in w] == []
+    assert missing_members(FORGED, found[0].result) == []
+    assert Guard(FORGED, on_missing_field="raise").blocks(found[0]) is False
 
 
 def test_an_address_is_remembered_an_hour_from_its_first_agent() -> None:
