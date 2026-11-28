@@ -1097,8 +1097,9 @@ class EntitlementPlan:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class EntitlementUsage:
-    """What the allowance window has spent: `hard_limit` is None where no cap stops the
-    lookups past `quota`."""
+    """What the allowance window has spent, on the free plan its trial's window, which begins
+    at the organization's first keyed lookup and ends once: `hard_limit` is None where no
+    cap stops the lookups past `quota`."""
 
     requests: int
     quota: int

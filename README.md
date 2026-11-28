@@ -85,10 +85,10 @@ acct = client.my_entitlement()
 print(acct.plan.key)          # data_4
 print(acct.plan.name)         # Data, the name to show
 print(acct.usage.requests)    # 580
-print(acct.usage.window_end)  # when the allowance resets
+print(acct.usage.window_end)  # when the allowance resets, or its trial ends on the free plan
 ```
 
-Usage counts against the anniversary of your subscription on a paid plan, not the calendar month and not the billing period; on the free plan it counts its trial, the lookups answered with every field. It is the same number a lookup is gated on. `hard_limit` is `None` on an uncapped plan, which is not the same as zero.
+Usage counts against the anniversary of your subscription on a paid plan, not the calendar month and not the billing period; on the free plan it counts its trial, the lookups answered with every field, in a window that begins at the organization's first keyed lookup and ends once. It is the same number a lookup is gated on. `hard_limit` is `None` on an uncapped plan, which is not the same as zero.
 
 Both are on the async client too: `await client.my_ip()` and `await client.my_entitlement()`.
 
